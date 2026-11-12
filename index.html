@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=6f2b1d5032">
+<link rel="stylesheet" href="style.css?v=37e63f4ffb">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -138,10 +138,21 @@
           <div id="trResult" hidden>
             <h2 class="section">Mienh</h2>
             <div class="card result" id="resultCard">
-              <textarea id="mienOut" aria-label="Mienh translation" spellcheck="false"></textarea>
-              <div class="row">
-                <button class="btn secondary" id="copyBtn">Copy</button>
+              <div class="row result-tools">
+                <label class="check inline"><input type="checkbox" id="sideChk"> English side by side</label>
+                <span class="spacer"></span>
+                <button class="btn secondary small" id="copyBtn" type="button">Copy</button>
+                <button class="btn secondary small" id="printBtn" type="button">Print</button>
+                <button class="btn secondary small" id="pdfBtn" type="button">Create PDF</button>
               </div>
+              <textarea id="mienOut" aria-label="Mienh translation" spellcheck="false"></textarea>
+              <div class="side-view" id="sideView" hidden>
+                <table class="side-table">
+                  <thead><tr><th>Mienh</th><th>English</th></tr></thead>
+                  <tbody id="sideBody"></tbody>
+                </table>
+              </div>
+              <div class="hint" id="sideHint" hidden></div>
             </div>
             <div id="notesBox" hidden>
               <h2 class="section">Words to check</h2>
@@ -171,6 +182,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=6f2b1d5032"></script>
+<script type="module" src="app.js?v=37e63f4ffb"></script>
+<div id="printArea" aria-hidden="true"></div>
 </body>
 </html>

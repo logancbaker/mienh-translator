@@ -360,3 +360,38 @@ textarea#mienOut { min-height: 360px; max-height: min(70vh, 900px); font-size: 1
 }
 .chip.install { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .chip.install:hover { filter: brightness(1.05); }
+
+/* ---- Result tools, side-by-side view ---- */
+.result-tools { margin: 0 0 10px; }
+.btn.small { padding: 7px 12px; font-size: 14px; }
+.side-view { max-height: min(70vh, 900px); overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.side-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.side-table th {
+  position: sticky; top: 0; z-index: 1; background: var(--surface); text-align: left;
+  font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+  padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+.side-table td { width: 50%; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.side-table td + td, .side-table th + th { border-left: 1px solid var(--line); }
+.side-table td.mi { font-size: 16px; }
+.side-table td.mi:focus { outline: 2px solid var(--accent-soft); background: var(--bg); }
+.side-table td.en { color: var(--muted); font-size: 15px; }
+.side-table tr:last-child td { border-bottom: 0; }
+
+/* ---- Printing: only the translation, using the whole page ---- */
+#printArea { display: none; }
+@media print {
+  @page { margin: 0.55in 0.5in; }
+  html, body { background: #fff !important; color: #000 !important; }
+  body > *:not(#printArea) { display: none !important; }
+  #printArea { display: block !important; font: 11pt/1.45 Georgia, "Times New Roman", serif; color: #000; }
+  #printArea .p-head { display: flex; justify-content: space-between; font: 9pt -apple-system, Helvetica, Arial, sans-serif; color: #555; border-bottom: 1px solid #999; padding-bottom: 4pt; margin-bottom: 10pt; }
+  #printArea p { margin: 0 0 9pt; orphans: 3; widows: 3; }
+  #printArea table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  #printArea thead { display: table-header-group; }
+  #printArea th { text-align: left; font: 700 9pt -apple-system, Helvetica, Arial, sans-serif; text-transform: uppercase; letter-spacing: .06em; color: #333; border-bottom: 1.2pt solid #000; padding: 0 8pt 4pt; }
+  #printArea td { width: 50%; vertical-align: top; padding: 6pt 8pt 7pt; border-bottom: .5pt solid #bbb; white-space: pre-wrap; }
+  #printArea td + td, #printArea th + th { border-left: .5pt solid #bbb; }
+  #printArea td.en { color: #222; }
+  #printArea tr { break-inside: auto; }
+}

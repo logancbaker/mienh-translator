@@ -305,6 +305,11 @@ $("goBtn").onclick = async () => {
   const chosenEffort = $("effortSel").value === "medium" ? "medium" : "high";
   const wantNotes = $("notesChk").checked;
   const nEnglish = text.split(/\s+/).filter(Boolean).length;
+  const paras = splitParas(text);
+  lastEnglish = paras;
+  const toSend = paras.length > 1
+    ? "The English is split into numbered paragraphs ([1], [2], …). Translate every paragraph and start each Mienh paragraph with the same number in brackets, one Mienh paragraph per number, so the two stay paired.\n\n" + paras.map((x, i) => `[${i + 1}] ${x}`).join("\n\n")
+    : text;
   $("goBtn").disabled = true;
   $("resetBtn").disabled = true;
   const started = Date.now();
@@ -333,7 +338,7 @@ $("goBtn").onclick = async () => {
       messages: [{ role: "user", content: [
         { type: "text", text: context },
         { type: "text", text: (wantNotes ? "" : "Skip the notes this time: answer with only the <translation> section.\n\n") +
-          "Translate this English into Iu-Mienh:\n\n" + text },
+          "Translate this English into Iu-Mienh:\n\n" + toSend },
       ] }],
     });
     let soFar = "";
@@ -341,15 +346,17 @@ $("goBtn").onclick = async () => {
       const box = $("mienOut");
       const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
       soFar += t;
-      box.value = liveTranslation(soFar);
+      box.value = unmark(liveTranslation(soFar));
+      if ($("sideChk").checked) renderSide();
       fitMien();
       if (atEnd) box.scrollTop = box.scrollHeight;
     });
     const msg = await stream.finalMessage();
     if (msg.stop_reason === "refusal") throw new Error("Claude declined to translate this text.");
     const out = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-    $("mienOut").value = tag(out, "translation") || out.trim();
+    $("mienOut").value = readParas(tag(out, "translation") || out.trim(), paras.length).join("\n\n");
     fitMien();
+    renderSide();
     const notesText = wantNotes ? tag(out, "notes") : "";
     const notes = notesText.split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
     $("notes").replaceChildren(...notes.map((n) => el("li", null, n)));
@@ -583,9 +590,160 @@ function setupHome() {
 // translation, notes and messages too. The password and tab stay remembered.
 $("resetBtn").onclick = () => {
   store("draft", null);
+  lastEnglish = [];
   $("enIn").value = "";
   try { sessionStorage.setItem("startTab", "tr"); } catch (e) {}
   location.reload();
+};
+
+// ---- Paragraph pairing, side-by-side view, print and PDF ------------------------
+let lastEnglish = [];
+function splitParas(t) {
+  t = t.replace(/\r\n?/g, "\n").trim();
+  let parts = t.split(/\n\s*\n/);
+  if (parts.length === 1 && t.includes("\n")) parts = t.split("\n");  // pasted text with single line breaks
+  return parts.map((x) => x.trim()).filter(Boolean);
+}
+// "[1] … [2] …" (or plain paragraphs) -> list of Mienh paragraphs
+function readParas(t, n) {
+  if (/\[\d+\]/.test(t)) {
+    const out = [];
+    t.split(/\[(\d+)\]/).forEach((chunk, i, arr) => {
+      if (i % 2 === 1) out[Number(chunk) - 1] = (arr[i + 1] || "").trim();
+    });
+    return Array.from({ length: Math.max(out.length, n) }, (_, i) => out[i] || "");
+  }
+  return splitParas(t);
+}
+const unmark = (t) => t.replace(/\s*\[\d+\]\s*/g, "\n\n").trim();
+
+function pairs() {
+  const mi = $("mienOut").value.trim() ? $("mienOut").value.split(/\n\s*\n/).map((x) => x.trim()) : [];
+  const n = Math.max(mi.length, lastEnglish.length);
+  return Array.from({ length: n }, (_, i) => ({ mi: mi[i] || "", en: lastEnglish[i] || "" }));
+}
+function renderSide() {
+  const on = $("sideChk").checked;
+  $("sideView").hidden = !on;
+  $("mienOut").hidden = on;
+  const hint = $("sideHint");
+  hint.hidden = true;
+  if (!on) { fitMien(); return; }
+  const rows = pairs();
+  $("sideBody").replaceChildren(...rows.map((r, i) => {
+    const tr = el("tr");
+    const mi = el("td", "mi", r.mi), en = el("td", "en", r.en);
+    mi.contentEditable = "true";
+    mi.spellcheck = false;
+    mi.dataset.i = i;
+    mi.oninput = () => {  // edits here flow back into the Mienh text
+      const cells = [...$("sideBody").querySelectorAll("td.mi")].map((c) => c.innerText.trim());
+      $("mienOut").value = cells.join("\n\n");
+    };
+    tr.append(mi, en);
+    return tr;
+  }));
+  const mCount = rows.filter((r) => r.mi).length, eCount = lastEnglish.length;
+  if (eCount && mCount && mCount !== eCount) {
+    hint.textContent = `Heads up: ${eCount} English paragraphs but ${mCount} Mienh paragraphs, so some rows may not line up.`;
+    hint.hidden = false;
+  }
+}
+$("sideChk").checked = load("side") === "on";
+$("sideChk").onchange = () => { store("side", $("sideChk").checked ? "on" : null); renderSide(); };
+
+function today() { return new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" }); }
+
+$("printBtn").onclick = () => {
+  const area = $("printArea"), side = $("sideChk").checked;
+  const head = el("div", "p-head");
+  head.append(el("span", null, "Mienh Translator"), el("span", null, today()));
+  area.replaceChildren(head);
+  if (side) {
+    const t = el("table"), thead = el("thead"), hr = el("tr"), tb = el("tbody");
+    hr.append(el("th", null, "Mienh"), el("th", null, "English"));
+    thead.append(hr);
+    for (const r of pairs()) {
+      const tr = el("tr");
+      tr.append(el("td", "mi", r.mi), el("td", "en", r.en));
+      tb.append(tr);
+    }
+    t.append(thead, tb);
+    area.append(t);
+  } else {
+    for (const para of pairs().map((r) => r.mi).filter(Boolean)) area.append(el("p", null, para));
+  }
+  window.print();
+};
+
+// PDF: drawn with jsPDF so both columns stay on the same lines across pages.
+let jsPDFLoad = null;
+function loadJsPDF() {
+  if (!jsPDFLoad) {
+    jsPDFLoad = new Promise((ok, bad) => {
+      const sc = document.createElement("script");
+      sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      sc.onload = () => ok(window.jspdf.jsPDF);
+      sc.onerror = () => { jsPDFLoad = null; bad(new Error("Couldn't load the PDF maker. Check the connection.")); };
+      document.head.append(sc);
+    });
+  }
+  return jsPDFLoad;
+}
+// jsPDF's built-in fonts only know Latin-1 + a few marks; swap anything else for a close equivalent.
+const pdfSafe = (t) => t.replace(/[‘’ʼ]/g, "'").replace(/[“”]/g, '"')
+  .replace(/↔/g, "<->").replace(/→/g, "->").replace(/[–—]/g, "-").replace(/…/g, "...")
+  .replace(/[^\x09\x0a\x0d\x20-\x7e\xa0-\xff]/g, "");
+
+$("pdfBtn").onclick = async () => {
+  const btn = $("pdfBtn");
+  btn.disabled = true; btn.textContent = "Making PDF…";
+  try {
+    const JsPDF = await loadJsPDF();
+    const doc = new JsPDF({ unit: "pt", format: "letter" });
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+    const M = 40, top = M + 26, bottom = H - M, gutter = 22, size = 10.5, lh = size * 1.42;
+    const side = $("sideChk").checked;
+    const colW = side ? (W - 2 * M - gutter) / 2 : W - 2 * M;
+    let page = 1, y = top;
+    const header = () => {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(110);
+      doc.text("Mienh Translator", M, M + 6);
+      doc.text(`${today()}  ·  page ${page}`, W - M, M + 6, { align: "right" });
+      doc.setDrawColor(170); doc.setLineWidth(0.5); doc.line(M, M + 12, W - M, M + 12);
+      if (side) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(60);
+        doc.text("MIENH", M, top - 2); doc.text("ENGLISH", M + colW + gutter, top - 2);
+        y = top + 10;
+      } else y = top;
+      doc.setTextColor(0);
+    };
+    const newPage = () => { doc.addPage(); page += 1; header(); };
+    header();
+    doc.setFont("times", "normal"); doc.setFontSize(size);
+    for (const r of pairs()) {
+      const L = doc.splitTextToSize(pdfSafe(r.mi), colW);
+      const R = side ? doc.splitTextToSize(pdfSafe(r.en), colW) : [];
+      const rows = Math.max(L.length, R.length);
+      if (!rows) continue;
+      // start a short paragraph on a new page rather than split it
+      if (rows <= 6 && y + rows * lh > bottom) newPage();
+      for (let i = 0; i < rows; i++) {
+        if (y + lh > bottom) newPage();
+        doc.setFont("times", "normal"); doc.setFontSize(size); doc.setTextColor(0);
+        if (L[i]) doc.text(L[i], M, y + size);
+        if (R[i]) { doc.setTextColor(50); doc.text(R[i], M + colW + gutter, y + size); }
+        y += lh;
+      }
+      y += lh * 0.6;
+      if (side && y < bottom) { doc.setDrawColor(215); doc.line(M, y - lh * 0.3, W - M, y - lh * 0.3); }
+    }
+    doc.save(`mienh-translation-${new Date().toISOString().slice(0, 10)}.pdf`);
+  } catch (e) {
+    fail(e.message || "Couldn't make the PDF.");
+  } finally {
+    btn.disabled = false; btn.textContent = "Create PDF";
+  }
 };
 
 // The Mienh box grows to fit its text, so long translations spill down the page.
