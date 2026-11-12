@@ -47,6 +47,7 @@ $("unlock").addEventListener("submit", async (e) => {
   try { ok = await tryUnlock($("pw").value, $("remember").checked); }
   catch (err) { $("unlockErr").textContent = "Couldn't load the data. Check the connection and try again."; $("unlockErr").hidden = false; }
   if (!ok && $("unlockErr").hidden) { $("unlockErr").textContent = "That password didn't work."; $("unlockErr").hidden = false; }
+  if (!ok) { const f = $("unlock"); f.classList.remove("rise", "shake"); void f.offsetWidth; f.classList.add("shake"); }
   $("unlockBtn").disabled = false;
   $("unlockBtn").textContent = "Open";
 });
@@ -91,7 +92,10 @@ function init(data) {
     const d = load("draft");
     if (d) { $("enIn").value = d; updateCount(); }
   } catch (e) {}
-  showTab(load("tab") === "tr" ? "tr" : "dict");
+  let start = null;
+  try { start = sessionStorage.getItem("startTab"); sessionStorage.removeItem("startTab"); } catch (e) {}
+  setupHome();
+  showTab(start === "tr" ? "tr" : "home");
 }
 
 function glossHit(nen, forms) {
@@ -184,7 +188,7 @@ function runSearch() {
       " · " + plural(r.totalSentences, "example sentence", "example sentences") +
       (r.totalSentences > r.sentences.length ? ` (showing ${r.sentences.length})` : "")
     : "";
-  if (!r.entries.length && !r.sentences.length) { out.append(el("div", "empty", `Nothing found for “${q}”.`)); return; }
+  if (!r.entries.length && !r.sentences.length) { out.append(emptyState(q)); return; }
   if (r.entries.length) {
     const card = el("div", "card"), ul = el("ul", "results");
     for (const e of r.entries) {
@@ -198,6 +202,7 @@ function runSearch() {
       ul.append(li);
     }
     card.append(ul);
+    stagger(ul);
     out.append(el("h2", "section", "Dictionary"), card);
   }
   if (r.sentences.length) {
@@ -209,6 +214,7 @@ function runSearch() {
       ul.append(li);
     }
     card.append(ul);
+    stagger(ul);
     out.append(el("h2", "section", "Example sentences"), card);
   }
 }
@@ -294,6 +300,7 @@ $("goBtn").onclick = async () => {
     $("trStatus").textContent = `Translating… ${s}s` + (s > 40 ? " (long texts take a few minutes)" : "");
   }, 1000);
   $("trStatus").textContent = "Translating…";
+  $("trDots").hidden = false;
   $("trResult").hidden = false;
   $("notesBox").hidden = true;
   $("trMeta").textContent = "";
@@ -329,7 +336,8 @@ $("goBtn").onclick = async () => {
     addToTotal(cost);
     $("trMeta").textContent = `Cost about $${cost.toFixed(2)} (${(D.models[chosenModel] || {}).label || chosenModel}, ${chosenEffort} effort) · ${nWords} words looked up, ${nMissing} not in the dictionary` +
       (msg.stop_reason === "max_tokens" ? " · The answer was cut off: try a shorter text." : "");
-    $("trStatus").textContent = "Done.";
+    $("trStatus").textContent = "Done!";
+    celebrate();
   } catch (e) {
     $("trStatus").textContent = "";
     const status = e && e.status;
@@ -340,6 +348,7 @@ $("goBtn").onclick = async () => {
     if (!$("mienOut").value) $("trResult").hidden = true;
   } finally {
     clearInterval(tick);
+    $("trDots").hidden = true;
     $("goBtn").disabled = false;
     $("resetBtn").disabled = false;
   }
@@ -358,26 +367,160 @@ function setupOptions() {
   $("effortSel").onchange = () => store("effort", $("effortSel").value);
   showTotal();
 }
-function getTotal() {
-  try { return JSON.parse(load("costTotal")) || { usd: 0, n: 0, since: null }; }
-  catch (e) { return { usd: 0, n: 0, since: null }; }
+// History of translation costs on this device: [{d: "YYYY-MM-DD", usd}]
+function getHistory() {
+  try {
+    const h = JSON.parse(load("costHistory"));
+    if (Array.isArray(h)) return h;
+  } catch (e) {}
+  // Carry over the older one-number total, if there is one.
+  try {
+    const t = JSON.parse(load("costTotal"));
+    if (t && t.n) return [{ d: t.since || new Date().toISOString().slice(0, 10), usd: t.usd, n: t.n }];
+  } catch (e) {}
+  return [];
 }
 function addToTotal(cost) {
-  const t = getTotal();
-  t.usd += cost; t.n += 1; t.since = t.since || new Date().toISOString().slice(0, 10);
-  store("costTotal", JSON.stringify(t));
-  showTotal();
+  const h = getHistory();
+  h.push({ d: new Date().toISOString().slice(0, 10), usd: cost });
+  store("costHistory", JSON.stringify(h));
+  store("costTotal", null);
+  showTotal(true);
 }
-function showTotal() {
-  const t = getTotal(), box = $("costTotal");
-  if (!t.n) { box.replaceChildren(); return; }
-  const btn = el("button", null, "Reset total");
-  btn.type = "button";
-  btn.onclick = () => {
-    if (confirm("Set the running total back to $0.00?")) { store("costTotal", null); showTotal(); }
+function showTotal(bump) {
+  const h = getHistory();
+  const total = h.reduce((a, x) => a + x.usd, 0);
+  const n = h.reduce((a, x) => a + (x.n || 1), 0);
+  $("spendTotal").textContent = `$${total.toFixed(2)}`;
+  $("spendSub").textContent = n
+    ? `${n} translation${n === 1 ? "" : "s"} since ${h[0].d} · about $${(total / n).toFixed(2)} each`
+    : "No translations yet. Your first one will show up here.";
+  $("spendReset").hidden = !n;
+  if (bump) { const t = $("spendTotal"); t.classList.remove("bump"); void t.offsetWidth; t.classList.add("bump"); }
+  drawChart(h);
+}
+function drawChart(h) {
+  const svg = $("spendChart"), W = 240, H = 90, NS = "http://www.w3.org/2000/svg";
+  const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  svg.replaceChildren();
+  const defs = mk("defs", {});
+  const g = mk("linearGradient", { id: "spendFill", x1: 0, y1: 0, x2: 0, y2: 1 });
+  g.append(mk("stop", { offset: "0%", "stop-color": "var(--red)", "stop-opacity": ".35" }),
+           mk("stop", { offset: "100%", "stop-color": "var(--red)", "stop-opacity": "0" }));
+  defs.append(g);
+  svg.append(defs, mk("line", { class: "base", x1: 0, y1: H - 2, x2: W, y2: H - 2 }));
+  if (!h.length) { svg.append(mk("line", { class: "empty-line", x1: 0, y1: H / 2, x2: W, y2: H / 2 })); return; }
+  let cum = 0;
+  const pts = [[0, 0]].concat(h.map((x, i) => [i + 1, (cum += x.usd)]));
+  const max = cum || 1, last = pts.length - 1;
+  const xy = pts.map(([i, v]) => [(i / last) * W, H - 4 - (v / max) * (H - 12)]);
+  const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const grp = mk("g", { class: "reveal" });
+  grp.append(mk("path", { class: "area", d: `${line} L${W},${H - 2} L0,${H - 2} Z` }),
+             mk("path", { class: "line", d: line }));
+  svg.append(grp);
+  const title = mk("title", {});
+  title.textContent = h.map((x) => `${x.d}: $${x.usd.toFixed(2)}`).join("\n");
+  svg.append(title);
+}
+$("spendReset").onclick = () => {
+  if (confirm("Set this device's spending total back to $0.00?")) {
+    store("costHistory", null); store("costTotal", null); showTotal();
+  }
+};
+
+// ---- Fun bits -----------------------------------------------------------------
+const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function stagger(ul) {
+  [...ul.children].forEach((li, i) => { li.classList.add("rise"); li.style.setProperty("--i", i); });
+}
+
+function emptyState(q) {
+  const box = el("div", "empty pop");
+  box.append(el("span", "big", "🔍"), el("div", null, `No match for “${q}”. Check the tone letter, or try one of these:`));
+  const chips = el("div", "chips");
+  for (const w of ["hnyouv", "wuom", "happy", "water", "Tin-Hungh", "mother"]) {
+    const c = el("button", "chip", w);
+    c.type = "button";
+    c.onclick = () => { $("q").value = w; runSearch(); };
+    chips.append(c);
+  }
+  box.append(chips);
+  return box;
+}
+
+function celebrate() {
+  if (calm()) return;
+  const card = $("resultCard"), burst = el("div", "burst");
+  const colors = ["var(--red)", "var(--gold)", "var(--green)", "var(--pink)", "var(--indigo)"];
+  for (let i = 0; i < 16; i++) {
+    const b = el("i");
+    const a = (Math.PI * 2 * i) / 16 + Math.random() * 0.4, d = 40 + Math.random() * 50;
+    b.style.background = colors[i % colors.length];
+    b.style.setProperty("--x", `${Math.cos(a) * d}px`);
+    b.style.setProperty("--y", `${Math.sin(a) * d}px`);
+    b.style.setProperty("--r", `${Math.random() * 360}deg`);
+    burst.append(b);
+  }
+  card.append(burst);
+  setTimeout(() => burst.remove(), 1000);
+}
+
+function countUp(node, to) {
+  if (calm()) { node.textContent = to.toLocaleString(); return; }
+  const t0 = performance.now(), dur = 1100;
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    node.textContent = Math.round(to * e).toLocaleString();
+    if (k < 1) requestAnimationFrame(step);
   };
-  box.replaceChildren(el("span", null,
-    `Running total on this device: $${t.usd.toFixed(2)} for ${t.n} translation${t.n === 1 ? "" : "s"} since ${t.since}`), btn);
+  requestAnimationFrame(step);
+}
+
+// Word of the day: the same word all day for everyone, or a random one on request.
+let WOTD_POOL = null;
+function wotdPool() {
+  if (!WOTD_POOL) {
+    WOTD_POOL = ENTRIES.filter((e) => e.book && e.mien.length <= 18 && /^[a-z' -]+$/i.test(e.mien) &&
+      e.english.length >= 4 && e.english.length <= 70 && !/literally|abbreviation|contraction|prefix|suffix|name|^\(/i.test(e.english));
+  }
+  return WOTD_POOL;
+}
+function showWord(e) {
+  const body = $("wotdBody");
+  const word = el("div", "wotd-word", e.mien);
+  const gloss = el("div", "wotd-gloss", e.english);
+  const parts = [word, gloss];
+  if (e.exm) parts.push(el("div", "wotd-ex", `${e.exm} = ${e.exe}`));
+  const look = el("button", "chip", "Look it up →");
+  look.type = "button";
+  look.style.marginTop = "10px";
+  look.onclick = () => { showTab("dict"); $("q").value = e.mien; document.querySelector('.seg [data-dir="both"]').click(); };
+  parts.push(look);
+  const box = el("div", "pop");
+  box.append(...parts);
+  body.replaceChildren(box);
+}
+function setupHome() {
+  // Words of the title arrive one by one, in embroidery colors.
+  const t = $("heroTitle"), words = t.textContent.trim().split(/\s+/);
+  t.replaceChildren(...words.flatMap((w, i) => {
+    const sp = el("span", "w", w); sp.style.setProperty("--i", i);
+    return i ? [document.createTextNode(" "), sp] : [sp];
+  }));
+  countUp($("statWords"), ENTRIES.filter((e) => e.book).length);
+  countUp($("statSents"), SENTS.length);
+  const pool = wotdPool();
+  if (pool.length) {
+    const day = new Date().toISOString().slice(0, 10);
+    let h = 0; for (const c of day) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    showWord(pool[h % pool.length]);
+  }
+  $("wotdNext").onclick = () => { const p = wotdPool(); if (p.length) showWord(p[Math.floor(Math.random() * p.length)]); };
+  $("goDict").onclick = () => { showTab("dict"); $("q").focus(); };
+  $("goTr").onclick = () => { showTab("tr"); $("enIn").focus(); };
+  $("brandBtn").onclick = () => showTab("home");
 }
 
 // Reset: forget the English draft and reload the page, which clears the
@@ -385,7 +528,7 @@ function showTotal() {
 $("resetBtn").onclick = () => {
   store("draft", null);
   $("enIn").value = "";
-  store("tab", "tr");
+  try { sessionStorage.setItem("startTab", "tr"); } catch (e) {}
   location.reload();
 };
 
@@ -396,14 +539,20 @@ $("copyBtn").onclick = async () => {
 };
 
 // ---- Tabs and start ----------------------------------------------------------
-const tabs = { dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")] };
+const tabs = { home: [$("tab-home"), $("panel-home")], dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")] };
 function showTab(name) {
   for (const [k, [btn, panel]] of Object.entries(tabs)) {
-    btn.setAttribute("aria-selected", String(k === name));
-    panel.hidden = k !== name;
+    const on = k === name, was = !panel.hidden;
+    btn.setAttribute("aria-selected", String(on));
+    panel.hidden = !on;
+    if (on && !was) {
+      // replay the slide-in for this page's cards
+      panel.querySelectorAll(".rise").forEach((n) => { n.style.animation = "none"; void n.offsetWidth; n.style.animation = ""; });
+    }
   }
-  store("tab", name);
+  if (name === "tr") showTotal();
 }
+$("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
 $("tab-tr").onclick = () => { showTab("tr"); $("enIn").focus(); };
 

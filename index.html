@@ -5,13 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Mienh Translator</title>
-<link rel="stylesheet" href="style.css?v=c67c46edbf">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f2a5a'/%3E%3Cpath d='M16 5l11 11-11 11L5 16z' fill='%23d63b2f'/%3E%3Cpath d='M16 10l6 6-6 6-6-6z' fill='%23f2b632'/%3E%3Cpath d='M16 13.5l2.5 2.5-2.5 2.5-2.5-2.5z' fill='%231f2a5a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=a64fcd8603">
 </head>
 <body>
+<div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
 <div class="wrap">
 
   <!-- Unlock screen -->
-  <form class="card login" id="unlock" hidden>
+  <form class="card login rise" id="unlock" hidden>
+    <div class="logo big" aria-hidden="true"></div>
     <h1>Mienh Translator</h1>
     <div class="meta">Private. Enter the password to open.</div>
     <div id="unlockErr" class="banner err" hidden></div>
@@ -21,21 +24,65 @@
     <button class="btn" type="submit" id="unlockBtn">Open</button>
   </form>
 
-  <div id="loading" class="meta" style="text-align:center;margin-top:20vh">Loading…</div>
+  <div id="loading" class="loading"><div class="logo big spin" aria-hidden="true"></div>Loading…</div>
 
   <!-- App -->
   <div id="app" hidden>
     <header class="top">
-      <div class="brand">Mienh Translator<small>English ↔ Iu-Mienh</small></div>
+      <button class="brand" id="brandBtn" type="button" aria-label="Home">
+        <span class="logo" aria-hidden="true"></span>
+        <span>Mienh Translator<small>English ↔ Iu-Mienh</small></span>
+      </button>
     </header>
+    <div class="stitch" aria-hidden="true"></div>
 
     <nav class="tabs" role="tablist">
-      <button role="tab" id="tab-dict" aria-selected="true" aria-controls="panel-dict">Dictionary</button>
+      <button role="tab" id="tab-home" aria-selected="true" aria-controls="panel-home">Home</button>
+      <button role="tab" id="tab-dict" aria-selected="false" aria-controls="panel-dict">Dictionary</button>
       <button role="tab" id="tab-tr" aria-selected="false" aria-controls="panel-tr">Translate</button>
     </nav>
 
-    <section class="panel" id="panel-dict" role="tabpanel" aria-labelledby="tab-dict">
-      <div class="card">
+    <!-- Welcome -->
+    <section class="panel" id="panel-home" role="tabpanel" aria-labelledby="tab-home">
+      <div class="hero">
+        <h1 class="hero-title" id="heroTitle">Longx hnyouv duqv zipv janx baeqc ga'naaiv-hngongx</h1>
+        <p class="hero-sub rise" style="--i:6">A private English ↔ Iu-Mienh helper. Look up any word in Smith Panh's dictionary, see how it's used in the Mienh Bible and other books, or paste English and get a Mienh translation in seconds.</p>
+        <div class="stats rise" style="--i:7">
+          <div><b id="statWords">0</b><span>dictionary words</span></div>
+          <div><b id="statSents">0</b><span>example sentences</span></div>
+          <div><b id="statPages">314</b><span>book pages so far</span></div>
+        </div>
+      </div>
+
+      <div class="go-grid">
+        <button class="go-card rise" style="--i:8" id="goDict" type="button">
+          <span class="go-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h5"/></svg>
+          </span>
+          <span class="go-text"><b>Look up a word</b><span>Mienh → English or English → Mienh</span></span>
+          <span class="go-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="go-card rise" style="--i:9" id="goTr" type="button">
+          <span class="go-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h8M8 3v2M5.5 5c.8 3 3 5.5 6 7M10.5 5c-.8 3.5-3.2 6.5-6.5 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg>
+          </span>
+          <span class="go-text"><b>Translate English</b><span>Paste a sentence, a talk, a letter…</span></span>
+          <span class="go-arrow" aria-hidden="true">→</span>
+        </button>
+      </div>
+
+      <div class="card wotd rise" style="--i:10" id="wotd">
+        <div class="wotd-head">
+          <span class="kicker">Word of the day</span>
+          <button class="chip" id="wotdNext" type="button">Show me another ↻</button>
+        </div>
+        <div class="wotd-body" id="wotdBody"></div>
+      </div>
+    </section>
+
+    <!-- Dictionary -->
+    <section class="panel" id="panel-dict" role="tabpanel" aria-labelledby="tab-dict" hidden>
+      <div class="card rise">
         <form class="searchbar" id="searchForm">
           <input type="search" id="q" placeholder="Type a Mienh or English word" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Word to look up">
           <div class="seg" role="group" aria-label="Search direction">
@@ -50,49 +97,67 @@
       <div id="dictOut"></div>
     </section>
 
+    <!-- Translate -->
     <section class="panel" id="panel-tr" role="tabpanel" aria-labelledby="tab-tr" hidden>
-      <div class="card">
-        <label for="enIn" class="meta" style="display:block;margin-top:0">English</label>
-        <textarea id="enIn" placeholder="Paste English text here"></textarea>
-        <div class="row options">
-          <label for="modelSel">Model</label>
-          <select id="modelSel"></select>
-          <label for="effortSel">Effort</label>
-          <select id="effortSel">
-            <option value="high">High (more careful)</option>
-            <option value="medium">Medium (faster, cheaper)</option>
-          </select>
-        </div>
-        <div class="row">
-          <button class="btn" id="goBtn">Translate</button>
-          <button class="btn secondary" id="resetBtn" type="button">Reset</button>
-          <span class="status" id="trStatus"></span>
-          <span class="spacer"></span>
-          <span class="status" id="charCount"></span>
-        </div>
-        <div id="trError"></div>
-      </div>
-      <div class="meta total" id="costTotal"></div>
+      <div class="tr-grid">
+        <div class="tr-main">
+          <div class="card rise">
+            <label for="enIn" class="meta" style="display:block;margin-top:0">English</label>
+            <textarea id="enIn" placeholder="Paste English text here"></textarea>
+            <div class="row options">
+              <span class="opt"><label for="modelSel">Model</label>
+              <select id="modelSel"></select></span>
+              <span class="opt"><label for="effortSel">Effort</label>
+              <select id="effortSel">
+                <option value="high">High (more careful)</option>
+                <option value="medium">Medium (faster, cheaper)</option>
+              </select></span>
+            </div>
+            <div class="row">
+              <button class="btn" id="goBtn">Translate</button>
+              <button class="btn secondary" id="resetBtn" type="button">Reset</button>
+              <span class="dots" id="trDots" hidden aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="status" id="trStatus"></span>
+              <span class="spacer"></span>
+              <span class="status" id="charCount"></span>
+            </div>
+            <div id="trError"></div>
+          </div>
 
-      <div id="trResult" hidden>
-        <h2 class="section">Mienh</h2>
-        <div class="card">
-          <textarea id="mienOut" aria-label="Mienh translation" spellcheck="false"></textarea>
-          <div class="row">
-            <button class="btn secondary" id="copyBtn">Copy</button>
+          <div id="trResult" hidden>
+            <h2 class="section">Mienh</h2>
+            <div class="card result" id="resultCard">
+              <textarea id="mienOut" aria-label="Mienh translation" spellcheck="false"></textarea>
+              <div class="row">
+                <button class="btn secondary" id="copyBtn">Copy</button>
+              </div>
+            </div>
+            <div id="notesBox" hidden>
+              <h2 class="section">Words to check</h2>
+              <div class="card"><ul class="notes" id="notes"></ul></div>
+            </div>
+            <div class="meta" id="trMeta"></div>
           </div>
         </div>
-        <div id="notesBox" hidden>
-          <h2 class="section">Words to check</h2>
-          <div class="card"><ul class="notes" id="notes"></ul></div>
-        </div>
-        <div class="meta" id="trMeta"></div>
+
+        <aside class="tr-side">
+          <div class="card spend rise" style="--i:2">
+            <div class="kicker">Spending on this device</div>
+            <div class="spend-total"><span id="spendTotal">$0.00</span></div>
+            <div class="spend-sub" id="spendSub">No translations yet</div>
+            <svg class="spend-chart" id="spendChart" viewBox="0 0 240 90" preserveAspectRatio="none" role="img" aria-label="Running total of translation costs"></svg>
+            <div class="spend-foot">
+              <span class="spend-note">Only this phone or computer. Everyone's total is in the Anthropic Console.</span>
+              <button class="chip" id="spendReset" type="button">Reset total</button>
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
 
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=c67c46edbf"></script>
+<script type="module" src="app.js?v=a64fcd8603"></script>
 </body>
 </html>
