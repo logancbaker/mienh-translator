@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Mienh Translator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Unlock screen -->
+  <form class="card login" id="unlock" hidden>
+    <h1>Mienh Translator</h1>
+    <div class="meta">Private. Enter the password to open.</div>
+    <div id="unlockErr" class="banner err" hidden></div>
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" required>
+    <label class="check"><input type="checkbox" id="remember" checked> Remember on this device</label>
+    <button class="btn" type="submit" id="unlockBtn">Open</button>
+  </form>
+
+  <div id="loading" class="meta" style="text-align:center;margin-top:20vh">Loading…</div>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="top">
+      <div class="brand">Mienh Translator<small>English ↔ Iu-Mienh</small></div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-dict" aria-selected="true" aria-controls="panel-dict">Dictionary</button>
+      <button role="tab" id="tab-tr" aria-selected="false" aria-controls="panel-tr">Translate</button>
+    </nav>
+
+    <section class="panel" id="panel-dict" role="tabpanel" aria-labelledby="tab-dict">
+      <div class="card">
+        <form class="searchbar" id="searchForm">
+          <input type="search" id="q" placeholder="Type a Mienh or English word" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Word to look up">
+          <div class="seg" role="group" aria-label="Search direction">
+            <button type="button" data-dir="both" aria-pressed="true">Both</button>
+            <button type="button" data-dir="mien" aria-pressed="false">Mienh → English</button>
+            <button type="button" data-dir="en" aria-pressed="false">English → Mienh</button>
+          </div>
+        </form>
+        <div class="hint">Tone letters matter: <em>aapv</em> and <em>aapx</em> are different words. Whole words only.</div>
+      </div>
+      <div id="dictMeta" class="meta"></div>
+      <div id="dictOut"></div>
+    </section>
+
+    <section class="panel" id="panel-tr" role="tabpanel" aria-labelledby="tab-tr" hidden>
+      <div class="card">
+        <label for="enIn" class="meta" style="display:block;margin-top:0">English</label>
+        <textarea id="enIn" placeholder="Paste English text here"></textarea>
+        <div class="row">
+          <button class="btn" id="goBtn">Translate</button>
+          <span class="status" id="trStatus"></span>
+          <span class="spacer"></span>
+          <span class="status" id="charCount"></span>
+        </div>
+        <div id="trError"></div>
+      </div>
+
+      <div id="trResult" hidden>
+        <h2 class="section">Mienh</h2>
+        <div class="card">
+          <textarea id="mienOut" aria-label="Mienh translation" spellcheck="false"></textarea>
+          <div class="row">
+            <button class="btn secondary" id="copyBtn">Copy</button>
+          </div>
+        </div>
+        <div id="notesBox" hidden>
+          <h2 class="section">Words to check</h2>
+          <div class="card"><ul class="notes" id="notes"></ul></div>
+        </div>
+        <div class="meta" id="trMeta"></div>
+      </div>
+    </section>
+
+    <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
+  </div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
