@@ -81,8 +81,8 @@ function index(map, i, text) {
 
 function init(data) {
   D = data;
-  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src]) => ({
-    mien, sense, english, exm, exe, page, book: !!book, src,
+  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx]) => ({
+    mien, sense, english, exm, exe, page, book: !!book, src, rank: rank ?? (book ? 1 : 2), corr: rank === 0, ctx,
     nmien: norm(mien).replace(/!+$/, "").trim(), nen: norm(english),
   }));
   SENTS = data.sentences.map(([mien, english, label, ref]) => ({
@@ -124,7 +124,7 @@ function search(q, dir, limit = 80, sentLimit = 20) {
       else if (rx.test(r.nmien)) score = 2;
     }
     if (dir !== "mien" && score === null && rx.test(r.nen)) score = glossHit(r.nen, [nq]) ? 1 : 3;
-    if (score !== null) hits.push([r.book ? 0 : 1, score, r.mien.length, r.mien.toLowerCase(), r]);
+    if (score !== null) hits.push([r.rank, score, r.mien.length, r.mien.toLowerCase(), r]);
   }
   hits.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || (a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0));
   const sh = SENTS.filter((s) => (dir !== "en" && rx.test(s.nmien)) || (dir !== "mien" && rx.test(s.nen)));
@@ -146,7 +146,7 @@ function glossaryFor(words, perWord = 6) {
   for (const w of words) {
     const forms = wordForms(w);
     const idx = new Set(forms.flatMap((f) => EN_INDEX.get(f) || []));
-    const found = [...idx].map((i) => ENTRIES[i]).map((r) => [r.book ? 0 : 1, glossHit(r.nen, forms) ? 0 : 1, r.nen.length, r]);
+    const found = [...idx].map((i) => ENTRIES[i]).map((r) => [r.rank, glossHit(r.nen, forms) ? 0 : 1, r.nen.length, r]);
     found.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
     if (found.length) out.set(w, found.slice(0, perWord).map((f) => f[3]));
   }
@@ -204,10 +204,11 @@ function runSearch() {
       const li = el("li"), head = el("div");
       head.append(el("span", "mien", e.mien));
       if (e.sense) head.append(el("span", "sense", `[${e.sense}]`));
-      if (!e.book) head.append(el("span", "tag", "not in the book"));
+      if (e.corr) head.append(el("span", "tag corr", "fluent speaker"));
+      else if (!e.book) head.append(el("span", "tag", "not in the Panh dictionary"));
       li.append(head, el("div", "gloss", e.english));
       if (e.exm) li.append(el("div", "ex", `${e.exm} = ${e.exe}`));
-      li.append(el("div", "src", e.book ? `p. ${e.page}` : e.src));
+      li.append(el("div", "src", e.book ? `p. ${e.page}` : e.corr ? e.src.replace("Correction from ", "") : e.src));
       li.lastChild.title = e.book ? `Panh dictionary, page ${e.page}` : e.src;
       if (e.exm) li.append(li.querySelector(".ex"));
       ul.append(li);
@@ -246,8 +247,10 @@ function contentWords(text, cap = 400) {
 
 function staticSystem() {
   const verified = SENTS.filter((s) => s.confirmed).map((s) => `- ${s.english} = ${s.mien}`);
+  const corr = ENTRIES.filter((r) => r.corr).map((r) => `- ${r.english} = ${r.mien} (${r.src.replace("Correction ", "")}${r.ctx ? `; in: ${r.ctx}` : ""})`);
   return [
     D.instructions,
+    "# Corrections from fluent Mienh speakers (they override the Panh dictionary's word choice)\n\n" + (corr.join("\n") || "(none yet)"),
     "# The user's translation rules\n\n" + D.rules,
     "# Grammar notes\n\n" + D.grammar,
     "# Translations the user has confirmed as correct\n\n" + (verified.join("\n") || "(none yet)"),
@@ -303,6 +306,8 @@ $("goBtn").onclick = async () => {
 
   const chosenModel = D.models[$("modelSel").value] ? $("modelSel").value : D.model;
   const chosenEffort = $("effortSel").value === "medium" ? "medium" : "high";
+  lastModel = chosenModel;
+  if (correcting) setCorrecting(false);
   const wantNotes = $("notesChk").checked;
   const nEnglish = text.split(/\s+/).filter(Boolean).length;
   const paras = splitParas(text);
@@ -632,8 +637,9 @@ function renderSide() {
   const rows = pairs();
   $("sideBody").replaceChildren(...rows.map((r, i) => {
     const tr = el("tr");
+    tr.dataset.i = i;
     const mi = el("td", "mi", r.mi), en = el("td", "en", r.en);
-    mi.contentEditable = "true";
+    mi.contentEditable = correcting ? "false" : "true";
     mi.spellcheck = false;
     mi.dataset.i = i;
     mi.oninput = () => {  // edits here flow back into the Mienh text
@@ -745,6 +751,166 @@ $("pdfBtn").onclick = async () => {
     btn.disabled = false; btn.textContent = "Create PDF";
   }
 };
+
+// ---- Corrections from fluent speakers -------------------------------------------
+// Highlight words in the translation, type the correction, pick your name, send.
+// Corrections go to the user's private Google Sheet; a daily task reviews them.
+let correcting = false, lastModel = "", corrRange = null, corrInfo = null;
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { t.hidden = true; }, 2600);
+}
+
+function renderCorrView() {
+  $("corrView").replaceChildren(...pairs().map((r, i) => {
+    const p = el("p", "mi", r.mi);
+    p.dataset.i = i;
+    return p;
+  }).filter((p) => p.textContent));
+}
+
+function setCorrecting(on) {
+  correcting = on;
+  const side = $("sideChk").checked;
+  $("corrBtn").setAttribute("aria-pressed", String(on));
+  $("corrBtn").textContent = on ? "Done" : "✎ Suggest a correction";
+  $("resultCard").classList.toggle("correcting", on);
+  $("corrBanner").hidden = !on;
+  $("corrBanner").innerHTML = side
+    ? "Highlight <b>Mienh</b> to say what it means in English, or <b>English</b> to say how it should be in Mienh. Tap <b>Done</b> when finished."
+    : "Highlight the Mienh words you want to correct (press and hold on a phone). Tap <b>Done</b> when finished.";
+  if (side) {
+    $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on ? "false" : "true"; });
+  } else {
+    $("corrView").hidden = !on;
+    $("mienOut").hidden = on;
+    if (on) renderCorrView(); else fitMien();
+  }
+  if (!on) closePop();
+}
+$("corrBtn").onclick = () => {
+  if (!correcting && !$("mienOut").value.trim()) return;
+  setCorrecting(!correcting);
+};
+$("sideChk").addEventListener("change", () => { if (correcting) setCorrecting(true); });
+
+function selectionInfo() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const text = sel.toString().replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+  const view = $("sideChk").checked ? $("sideBody") : $("corrView");
+  if (!view.contains(node)) return null;
+  const cell = node.closest("td, p");
+  if (!cell) return null;
+  const isEnglish = cell.matches("td.en");
+  const row = cell.closest("tr, p");
+  const i = Number(row.dataset.i || 0);
+  const pr = pairs()[i] || { mi: "", en: "" };
+  return { text, range: range.cloneRange(), english: isEnglish, context_mien: pr.mi, context_english: pr.en };
+}
+
+function openPop(info) {
+  corrInfo = info;
+  corrRange = info.range;
+  const pop = $("corrPop");
+  $("corrKind").textContent = info.english ? "Say it in Mienh" : "Correct the Mienh";
+  $("corrSel").textContent = info.text;
+  $("corrLabel").textContent = info.english ? "How should this be said in Mienh?" : "What does this mean in English?";
+  $("corrText").spellcheck = !info.english;
+  $("corrText").value = "";
+  $("corrBetter").value = "";
+  $("corrBetterWrap").hidden = info.english;
+  $("corrWho").value = load("corrWho") || "";
+  $("corrMsg").textContent = ""; $("corrMsg").className = "corr-msg";
+  pop.hidden = false;
+  placePop(info.range.getBoundingClientRect());
+  setTimeout(() => $("corrText").focus({ preventScroll: true }), 30);
+}
+
+// Put the box below, above, right or left of the selection, wherever it fits.
+function placePop(r) {
+  const pop = $("corrPop");
+  pop.classList.remove("sheet");
+  if (window.innerWidth < 600) { pop.classList.add("sheet"); return; }
+  const w = pop.offsetWidth, h = pop.offsetHeight, gap = 10, vw = window.innerWidth, vh = window.innerHeight;
+  const sx = window.scrollX, sy = window.scrollY;
+  let top, left;
+  if (r.bottom + gap + h <= vh) { top = r.bottom + gap; left = r.left; }
+  else if (r.top - gap - h >= 0) { top = r.top - gap - h; left = r.left; }
+  else if (r.right + gap + w <= vw) { left = r.right + gap; top = Math.max(gap, Math.min(r.top, vh - h - gap)); }
+  else if (r.left - gap - w >= 0) { left = r.left - gap - w; top = Math.max(gap, Math.min(r.top, vh - h - gap)); }
+  else { pop.classList.add("sheet"); return; }
+  left = Math.max(gap, Math.min(left, vw - w - gap));
+  pop.style.left = `${left + sx}px`;
+  pop.style.top = `${top + sy}px`;
+}
+
+function closePop() { $("corrPop").hidden = true; corrInfo = null; corrRange = null; }
+$("corrClose").onclick = $("corrCancel").onclick = closePop;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("corrPop").hidden) closePop(); });
+
+let selTimer = null;
+function maybeOpen() {
+  if (!correcting || !$("corrPop").hidden) return;
+  const info = selectionInfo();
+  if (info) openPop(info);
+}
+document.addEventListener("mouseup", () => setTimeout(maybeOpen, 10));
+document.addEventListener("selectionchange", () => {  // phones: wait until the selection settles
+  if (!correcting) return;
+  clearTimeout(selTimer);
+  selTimer = setTimeout(maybeOpen, 700);
+});
+
+$("corrPop").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("corrMsg");
+  const cfg = D.corrections || {};
+  if (!cfg.url) { msg.textContent = "Corrections aren't connected yet. Ask Logan to finish the setup."; msg.className = "corr-msg err"; return; }
+  const text = $("corrText").value.trim(), who = $("corrWho").value;
+  if (!text) { msg.textContent = "Please type the correction."; msg.className = "corr-msg err"; $("corrText").focus(); return; }
+  if (!who) { msg.textContent = "Please choose your name."; msg.className = "corr-msg err"; $("corrWho").focus(); return; }
+  store("corrWho", who);
+  const info = corrInfo, range = corrRange;
+  const payload = {
+    token: cfg.token, who,
+    direction: info.english ? "english-to-mienh" : "mienh-to-english",
+    selected: info.text, correction: text, better_mien: info.english ? "" : $("corrBetter").value.trim(),
+    context_mien: info.context_mien, context_english: info.context_english, model: lastModel,
+  };
+  $("corrSend").disabled = true; msg.textContent = "Sending…"; msg.className = "corr-msg";
+  try {
+    let ok = false;
+    try {
+      const res = await fetch(cfg.url, { method: "POST", body: JSON.stringify(payload) });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok === false) throw new Error(data.error || "not accepted");
+      ok = true;
+    } catch (err) {
+      if (err instanceof TypeError) {  // the reply couldn't be read; send without reading it
+        await fetch(cfg.url, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+        ok = true;
+      } else throw err;
+    }
+    if (ok) {
+      try { const m = document.createElement("mark"); m.className = "sent"; range.surroundContents(m); } catch (x) {}
+      window.getSelection().removeAllRanges();
+      closePop();
+      toast(who === "Brandon" ? "Thanks! Sent for Logan to review." : "Thanks! Your correction was sent.");
+    }
+  } catch (err) {
+    msg.textContent = `Couldn't send it (${err.message}). Check the connection and try again.`;
+    msg.className = "corr-msg err";
+  } finally {
+    $("corrSend").disabled = false;
+  }
+});
 
 // The Mienh box grows to fit its text, so long translations spill down the page.
 function fitMien() {

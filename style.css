@@ -395,3 +395,34 @@ textarea#mienOut { min-height: 360px; max-height: min(70vh, 900px); font-size: 1
   #printArea td.en { color: #222; }
   #printArea tr { break-inside: auto; }
 }
+
+/* ---- Corrections ---- */
+#corrBtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.corr-banner { background: var(--warn-soft); border-radius: 10px; padding: 8px 12px; font-size: 14px; margin-bottom: 10px; }
+.corr-view { border: 1px dashed var(--accent); border-radius: 10px; padding: 12px 14px; max-height: min(70vh, 900px); overflow: auto; font-size: 17px; line-height: 1.6; }
+.corr-view p { margin: 0 0 12px; }
+.correcting .side-table td { cursor: text; }
+.correcting .side-table { outline: 1px dashed var(--accent); outline-offset: -1px; }
+mark.sent { background: none; color: inherit; text-decoration: underline wavy var(--green); text-underline-offset: 3px; }
+.corr-pop {
+  position: absolute; z-index: 50; width: min(340px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.22); animation: pop .25s ease both;
+}
+.corr-pop.sheet { position: fixed; left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; border-radius: 16px 16px 0 0; }
+.corr-pop-head { display: flex; justify-content: space-between; align-items: center; }
+.corr-x { appearance: none; border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; padding: 2px 6px; }
+.corr-sel { margin: 6px 0 4px; padding: 6px 9px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 6px; font-size: 15px; max-height: 5.5em; overflow: auto; }
+.corr-pop label { display: block; font-size: 13px; font-weight: 650; margin: 10px 0 4px; }
+.corr-pop .opt-l { font-weight: 400; color: var(--muted); }
+.corr-pop textarea { min-height: 0; font-size: 15px; }
+.corr-pop select { padding: 8px 10px; }
+.corr-msg { font-size: 13px; color: var(--muted); min-height: 0; margin-top: 6px; }
+.corr-msg.err { color: var(--red); }
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60;
+  background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: rise .3s ease both;
+}
+@media print { .corr-pop, .toast { display: none !important; } }
+.tag.corr { background: var(--ok-soft); color: var(--ok); }
