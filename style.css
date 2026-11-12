@@ -405,26 +405,29 @@ textarea#mienOut { min-height: 360px; max-height: min(70vh, 900px); font-size: 1
 .correcting .side-table { outline: 1px dashed var(--accent); outline-offset: -1px; }
 mark.sent { background: none; color: inherit; text-decoration: underline wavy var(--green); text-underline-offset: 3px; }
 .corr-pop {
-  position: absolute; z-index: 50; width: min(340px, calc(100vw - 24px));
-  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 14px;
+  position: absolute; z-index: 50; width: min(500px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px 20px;
   box-shadow: 0 12px 40px rgba(0,0,0,.22); animation: pop .25s ease both;
 }
 .corr-pop.sheet { position: fixed; left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; border-radius: 16px 16px 0 0; }
 .corr-pop-head { display: flex; justify-content: space-between; align-items: center; }
 .corr-x { appearance: none; border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; padding: 2px 6px; }
-.corr-sel { margin: 6px 0 4px; padding: 6px 9px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 6px; font-size: 15px; max-height: 5.5em; overflow: auto; }
-.corr-pop label { display: block; font-size: 13px; font-weight: 650; margin: 10px 0 4px; }
+.corr-sel { margin: 8px 0 4px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 6px; font-size: 16px; max-height: 6em; overflow: auto; }
+.corr-pop label { display: block; font-size: 14px; font-weight: 650; margin: 14px 0 6px; }
+.corr-pop .kicker { font-size: 13px; }
 .corr-pop .opt-l { font-weight: 400; color: var(--muted); }
-.corr-pop textarea { min-height: 0; font-size: 15px; }
+.corr-pop textarea { min-height: 0; font-size: 17px; line-height: 1.5; padding: 10px 12px; }
+.corr-pop .row { margin-top: 14px; }
+.corr-pop .btn.small { padding: 10px 18px; font-size: 15px; }
 .corr-pop select { padding: 8px 10px; }
 .corr-msg { font-size: 13px; color: var(--muted); min-height: 0; margin-top: 6px; }
 .corr-msg.err { color: var(--red); }
 .toast {
-  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60;
+  position: fixed; left: 0; right: 0; margin: 0 auto; width: fit-content; max-width: calc(100vw - 32px); bottom: 24px; z-index: 60;
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px;
   box-shadow: 0 8px 24px rgba(0,0,0,.25); animation: rise .3s ease both;
 }
-@media print { .corr-pop, .toast { display: none !important; } }
+@media print { .corr-pop, .toast, .corr-bubble, .how-modal { display: none !important; } }
 .tag.corr { background: var(--ok-soft); color: var(--ok); }
 
 /* ---- User picker ---- */
@@ -444,3 +447,55 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 /* Correcting: only the English column can be highlighted */
 .correcting .side-table td.mi { -webkit-user-select: none; user-select: none; cursor: default; opacity: .6; }
 .correcting .side-table td.en { color: var(--ink); background: var(--accent-soft); }
+
+/* ---- "Send correction" bubble over a selection ---- */
+.corr-bubble {
+  position: absolute; z-index: 45; appearance: none; border: 0; cursor: pointer; white-space: nowrap;
+  background: var(--ink); color: var(--bg); font: inherit; font-size: 13px; font-weight: 650;
+  padding: 7px 12px; border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.25); animation: pop .18s ease both;
+}
+.corr-bubble::after {
+  content: ""; position: absolute; left: 50%; bottom: -5px; margin-left: -5px;
+  border: 5px solid transparent; border-bottom: 0; border-top-color: var(--ink);
+}
+.corr-bubble.below::after { bottom: auto; top: -5px; border: 5px solid transparent; border-top: 0; border-bottom-color: var(--ink); }
+.corr-bubble:hover { background: var(--accent); color: var(--accent-ink); }
+.corr-bubble:hover::after { border-top-color: var(--accent); }
+.corr-bubble.below:hover::after { border-top-color: transparent; border-bottom-color: var(--accent); }
+.corr-banner .how-link { appearance: none; border: 0; background: var(--surface); color: var(--ink); font: inherit; font-weight: 650;
+  font-size: 13px; padding: 3px 10px; border-radius: 999px; margin-left: 6px; cursor: pointer; box-shadow: var(--shadow); }
+.corr-banner .how-link:hover { color: var(--accent); }
+
+/* ---- "Show me how" tutorial ---- */
+.how-modal { position: fixed; inset: 0; z-index: 70; background: rgba(20,22,35,.45); display: grid; place-items: center; padding: 16px; }
+.how-modal[hidden] { display: none; }
+.how-card { width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--surface);
+  border-radius: 18px; padding: 18px 20px 20px; box-shadow: 0 20px 60px rgba(0,0,0,.3); animation: pop .22s ease both; }
+.how-card h3 { margin: 0; font-size: 19px; }
+.how-steps { margin: 12px 0 14px; padding-left: 22px; font-size: 15px; line-height: 1.5; color: var(--muted); }
+.how-steps li { padding: 2px 6px; border-radius: 6px; transition: background .25s, color .25s; }
+.how-steps li.on { color: var(--ink); background: var(--accent-soft); font-weight: 600; }
+.how-stage { position: relative; height: 330px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 14px; overflow: hidden; user-select: none; -webkit-user-select: none; }
+.how-table { width: 100%; font-size: 15px; background: var(--surface); }
+.how-table td.mi { opacity: .6; }
+.how-table td.en { background: var(--accent-soft); color: var(--ink); }
+.how-table td.en span.sel { background: #9cc3ff; color: #0b1a33; border-radius: 2px; box-shadow: 0 0 0 1px #9cc3ff; }
+.how-wrong { text-decoration: underline wavy var(--red); text-underline-offset: 3px; }
+.how-bubble { pointer-events: none; transition: background .15s; }
+.how-bubble.press { background: var(--accent); transform: scale(.94); }
+.how-dialog { position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 14px; width: min(400px, calc(100% - 28px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; box-shadow: 0 12px 34px rgba(0,0,0,.2); animation: pop .22s ease both; }
+.how-dialog .corr-sel { font-size: 14px; }
+.how-label { font-size: 13px; font-weight: 650; margin: 8px 0 4px; }
+.how-input { min-height: 40px; border: 1px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 8px; padding: 8px 10px; font-size: 15px; background: var(--surface); }
+.how-caret { display: inline-block; width: 1.5px; height: 1.05em; background: var(--ink); vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.how-btns { display: flex; gap: 8px; margin-top: 10px; }
+.how-btns .btn.press { transform: scale(.94); filter: brightness(.9); }
+.how-toast { position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; bottom: 18px; background: var(--ink); color: var(--bg);
+  padding: 8px 14px; border-radius: 999px; font-size: 13px; white-space: nowrap; animation: rise .3s ease both; }
+.how-cursor { position: absolute; left: 0; top: 0; z-index: 5; pointer-events: none; transition: transform .7s cubic-bezier(.45,.05,.3,1); filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)); }
+.how-cursor.click { animation: tap .25s ease; }
+@keyframes tap { 50% { scale: .8; } }
+.how-actions { justify-content: flex-end; margin-top: 14px; }
+@media (max-width: 520px) { .how-stage { height: 380px; padding: 10px; } .how-table { font-size: 14px; } }

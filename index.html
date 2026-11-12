@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=2f9dc6f250">
+<link rel="stylesheet" href="style.css?v=f8a4a5593d">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -196,13 +196,13 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=2f9dc6f250"></script>
+<script type="module" src="app.js?v=f8a4a5593d"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>
   <div class="corr-sel" id="corrSel"></div>
   <label for="corrText" id="corrLabel">What does this mean in English?</label>
-  <textarea id="corrText" rows="2" required></textarea>
+  <textarea id="corrText" rows="4" required></textarea>
   <div id="corrBetterWrap">
     <label for="corrBetter">What should the Mienh say instead? <span class="opt-l">(optional)</span></label>
     <textarea id="corrBetter" rows="2" spellcheck="false"></textarea>
@@ -211,6 +211,38 @@
   <div class="corr-msg" id="corrMsg"></div>
   <div class="row"><button class="btn small" id="corrSend" type="submit">Send correction</button><button class="btn secondary small" id="corrCancel" type="button">Cancel</button></div>
 </form>
+<button class="corr-bubble" id="corrBubble" type="button" hidden>✎ Send correction</button>
+<div class="how-modal" id="howModal" hidden>
+  <div class="how-card" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+    <div class="corr-pop-head"><h3 id="howTitle">How to send a correction</h3><button type="button" class="corr-x" id="howClose" aria-label="Close">×</button></div>
+    <ol class="how-steps" id="howSteps">
+      <li>Highlight the English words that came out wrong.</li>
+      <li>Let go, then tap the <b>Send correction</b> bubble.</li>
+      <li>Type how it should be said in Mienh.</li>
+      <li>Press <b>Send correction</b>. That's it!</li>
+    </ol>
+    <div class="how-stage" id="howStage" aria-hidden="true">
+      <table class="side-table how-table">
+        <thead><tr><th>Mienh</th><th>English</th></tr></thead>
+        <tbody><tr>
+          <td class="mi">Dongh yie <span class="how-wrong">ziepc hnyangx</span> wuov zanc, yie hnamv doqc sou.</td>
+          <td class="en" id="howEn"><span>When</span> <span>I</span> <span>was</span> <span class="w">ten</span> <span class="w">years</span> <span class="w">old,</span> <span>I</span> <span>loved</span> <span>to</span> <span>read.</span></td>
+        </tr></tbody>
+      </table>
+      <div class="corr-bubble how-bubble" id="howBubble" hidden>✎ Send correction</div>
+      <div class="how-dialog" id="howDialog" hidden>
+        <div class="kicker">Say it in Mienh</div>
+        <div class="corr-sel">ten years old</div>
+        <div class="how-label">How should this be said in Mienh?</div>
+        <div class="how-input"><span id="howTyped"></span><i class="how-caret"></i></div>
+        <div class="how-btns"><span class="btn small" id="howSend">Send correction</span><span class="btn secondary small">Cancel</span></div>
+      </div>
+      <div class="how-toast" id="howToast" hidden>Thanks! Your correction was sent.</div>
+      <svg class="how-cursor" id="howCursor" viewBox="0 0 24 24" width="22" height="22"><path d="M4 2l15 10-7 1.4L8.4 21z" fill="#1d2235" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="row how-actions"><button class="btn secondary small" id="howReplay" type="button">↻ Replay</button><button class="btn small" id="howDone" type="button">Got it</button></div>
+  </div>
+</div>
 <div class="toast" id="toast" hidden></div>
 </body>
 </html>

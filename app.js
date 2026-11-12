@@ -860,9 +860,11 @@ function setCorrecting(on) {
   $("corrBtn").textContent = on ? "Done" : "✎ Suggest a correction";
   $("resultCard").classList.toggle("correcting", on);
   $("corrBanner").hidden = !on;
-  $("corrBanner").innerHTML = "Highlight the <b>English</b> words, then type how they should be said in Mienh (press and hold on a phone). Tap <b>Done</b> when finished.";
+  $("corrBanner").innerHTML = "Highlight the <b>English</b> words (press and hold on a phone), then tap the <b>Send correction</b> bubble. Tap <b>Done</b> when finished."
+    + '<button type="button" class="how-link" id="howBtn">▶ Show me how</button>';
+  if (on) $("howBtn").onclick = openHow;
   $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on ? "false" : "true"; });
-  if (!on) closePop();
+  if (!on) { closePop(); hideBubble(); }
 }
 $("corrBtn").onclick = () => {
   if (!correcting && (!$("mienOut").value.trim() || $("corrBtn").disabled)) return;
@@ -927,18 +929,126 @@ function closePop() { $("corrPop").hidden = true; corrInfo = null; corrRange = n
 $("corrClose").onclick = $("corrCancel").onclick = closePop;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("corrPop").hidden) closePop(); });
 
-let selTimer = null;
-function maybeOpen() {
-  if (!correcting || !$("corrPop").hidden) return;
+// Once a selection is let go, a small "Send correction" bubble appears above it;
+// the correction box opens only when that bubble is clicked.
+let selTimer = null, pointerDown = false, pendingSel = null, touchy = false;
+function hideBubble() { $("corrBubble").hidden = true; pendingSel = null; }
+function showBubble() {
+  if (!correcting || !$("corrPop").hidden || pointerDown) return;
   const info = selectionInfo();
-  if (info) openPop(info);
+  if (!info) { hideBubble(); return; }
+  pendingSel = info;
+  const b = $("corrBubble"), rects = info.range.getClientRects();
+  const first = rects[0] || info.range.getBoundingClientRect();
+  b.hidden = false;
+  b.style.animation = "none"; void b.offsetWidth; b.style.animation = "";
+  const w = b.offsetWidth, h = b.offsetHeight, gap = 9;
+  let top = first.top - h - gap, below = false;
+  // On phones the system's copy/paste menu sits above the selection, so go below it.
+  if (top < 8 || touchy) { top = (rects[rects.length - 1] || first).bottom + gap + (touchy ? 14 : 0); below = true; }
+  const mid = first.left + (rects.length > 1 ? first.width / 2 : info.range.getBoundingClientRect().width / 2);
+  const left = Math.max(8, Math.min(mid - w / 2, window.innerWidth - w - 8));
+  b.classList.toggle("below", below);
+  b.style.left = `${left + window.scrollX}px`;
+  b.style.top = `${top + window.scrollY}px`;
 }
-document.addEventListener("mouseup", () => setTimeout(maybeOpen, 10));
-document.addEventListener("selectionchange", () => {  // phones: wait until the selection settles
-  if (!correcting) return;
-  clearTimeout(selTimer);
-  selTimer = setTimeout(maybeOpen, 700);
+document.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("#corrBubble")) return;
+  touchy = e.pointerType === "touch";
+  pointerDown = true;
+  if (correcting) hideBubble();
 });
+document.addEventListener("pointerup", (e) => {
+  pointerDown = false;
+  if (e.target.closest("#corrBubble, #corrPop")) return;
+  setTimeout(showBubble, 30);
+});
+document.addEventListener("pointercancel", () => { pointerDown = false; });
+document.addEventListener("selectionchange", () => {  // phones: selection handles move without pointer events
+  if (!correcting || !$("corrPop").hidden) return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) { hideBubble(); return; }
+  clearTimeout(selTimer);
+  if (!pointerDown) { $("corrBubble").hidden = true; selTimer = setTimeout(showBubble, 500); }
+});
+$("corrBubble").addEventListener("mousedown", (e) => e.preventDefault());  // keep the selection
+$("corrBubble").onclick = () => {
+  const info = pendingSel || selectionInfo();
+  hideBubble();
+  if (info) openPop(info);
+};
+window.addEventListener("resize", () => { if (!$("corrBubble").hidden) showBubble(); });
+
+// ---- "Show me how": an animated walk-through of sending a correction ----------
+let howRun = 0;
+function openHow() {
+  $("howModal").hidden = false;
+  playHow();
+}
+function closeHow() { $("howModal").hidden = true; howRun++; }
+$("howClose").onclick = $("howDone").onclick = closeHow;
+$("howReplay").onclick = () => playHow();
+$("howModal").addEventListener("click", (e) => { if (e.target === $("howModal")) closeHow(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("howModal").hidden) closeHow(); });
+
+async function playHow() {
+  const run = ++howRun;
+  const wait = (ms) => new Promise((res, rej) => setTimeout(() => (run === howRun ? res() : rej("stop")), ms));
+  const stage = $("howStage"), cur = $("howCursor"), bub = $("howBubble"), dlg = $("howDialog");
+  const words = [...$("howEn").querySelectorAll("span")], targets = words.filter((w) => w.classList.contains("w"));
+  const steps = [...$("howSteps").children];
+  const step = (n) => steps.forEach((li, i) => li.classList.toggle("on", i === n));
+  const pos = (node, fx = 0.5, fy = 0.6) => {
+    const s = stage.getBoundingClientRect(), r = node.getBoundingClientRect();
+    return [r.left - s.left + r.width * fx, r.top - s.top + r.height * fy];
+  };
+  const move = async (xy, ms = 750) => { cur.style.transitionDuration = `${ms}ms`; cur.style.transform = `translate(${xy[0]}px, ${xy[1]}px)`; await wait(ms + 60); };
+  const click = async () => { cur.classList.remove("click"); void cur.offsetWidth; cur.classList.add("click"); await wait(260); };
+  try {
+    for (;;) {
+      words.forEach((w) => w.classList.remove("sel"));
+      bub.hidden = true; dlg.hidden = true; $("howToast").hidden = true; $("howTyped").textContent = "";
+      $("howSend").classList.remove("press"); bub.classList.remove("press");
+      step(0);
+      cur.style.transitionDuration = "0ms";
+      cur.style.transform = `translate(${stage.clientWidth * 0.55}px, ${stage.clientHeight - 40}px)`;
+      await wait(700);
+      // 1. drag across "ten years old,"
+      await move(pos(targets[0], 0, 0.6));
+      for (const w of targets) {
+        await move(pos(w, 1, 0.6), 380);
+        w.classList.add("sel");
+      }
+      await wait(400);
+      // 2. bubble appears above the selection; click it
+      step(1);
+      bub.hidden = false;
+      const s = stage.getBoundingClientRect(), a = targets[0].getBoundingClientRect(), z = targets[targets.length - 1].getBoundingClientRect();
+      const mid = (a.left + z.right) / 2 - s.left;
+      bub.style.left = `${Math.max(6, Math.min(mid - bub.offsetWidth / 2, stage.clientWidth - bub.offsetWidth - 6))}px`;
+      bub.style.top = `${a.top - s.top - bub.offsetHeight - 9}px`;
+      await wait(900);
+      await move(pos(bub, 0.5, 0.55), 650);
+      bub.classList.add("press"); await click(); await wait(150);
+      // 3. dialog opens; type the Mienh
+      bub.hidden = true;
+      dlg.hidden = false;
+      step(2);
+      await move(pos($("howTyped").parentElement, 0.15, 0.6), 600);
+      await wait(300);
+      for (const ch of "duqv ziepc hnyangx") { $("howTyped").textContent += ch; await wait(85); }
+      await wait(700);
+      // 4. press Send
+      step(3);
+      await move(pos($("howSend")), 650);
+      $("howSend").classList.add("press"); await click(); await wait(200);
+      dlg.hidden = true;
+      words.forEach((w) => w.classList.remove("sel"));
+      $("howToast").hidden = false;
+      await wait(2600);
+    }
+  } catch (e) { /* stopped or replayed */ }
+}
 
 $("corrPop").addEventListener("submit", async (e) => {
   e.preventDefault();
