@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=bdebc22cfc">
+<link rel="stylesheet" href="style.css?v=5681f4db1c">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -125,7 +125,16 @@
             </div>
             <label class="check inline"><input type="checkbox" id="notesChk" checked> Include “Words to check” notes</label>
             <div class="row">
-              <button class="btn" id="goBtn">Translate</button>
+              <span class="user-pick"><label for="userSel">User</label>
+              <select id="userSel" aria-label="Who is translating">
+                <option value="">Choose your name</option>
+                <option>Gauv Meng</option>
+                <option>Meix Waah</option>
+                <option>Yauz-Seng</option>
+                <option>Zanx Jiemh</option>
+                <option>Sister Hahn</option>
+              </select></span>
+              <button class="btn" id="goBtn" disabled title="Choose your name first">Translate</button>
               <button class="btn secondary" id="resetBtn" type="button">Reset</button>
               <span class="dots" id="trDots" hidden aria-hidden="true"><i></i><i></i><i></i></span>
               <span class="status" id="trStatus"></span>
@@ -185,7 +194,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=bdebc22cfc"></script>
+<script type="module" src="app.js?v=5681f4db1c"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>
@@ -196,14 +205,7 @@
     <label for="corrBetter">What should the Mienh say instead? <span class="opt-l">(optional)</span></label>
     <textarea id="corrBetter" rows="2" spellcheck="false"></textarea>
   </div>
-  <label for="corrWho">Who's sending this?</label>
-  <select id="corrWho" required>
-    <option value="">Choose your name</option>
-    <option>Gauv Meng</option>
-    <option>Meix Waah</option>
-    <option>Logan</option>
-    <option>Brandon</option>
-  </select>
+  <div class="corr-who">Sending as <b id="corrWho"></b></div>
   <div class="corr-msg" id="corrMsg"></div>
   <div class="row"><button class="btn small" id="corrSend" type="submit">Send correction</button><button class="btn secondary small" id="corrCancel" type="button">Cancel</button></div>
 </form>

@@ -426,3 +426,11 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 }
 @media print { .corr-pop, .toast { display: none !important; } }
 .tag.corr { background: var(--ok-soft); color: var(--ok); }
+
+/* ---- User picker ---- */
+.user-pick { display: inline-flex; align-items: center; gap: 8px; }
+.user-pick label { font-size: 14px; color: var(--muted); font-weight: 600; }
+.user-pick select { width: auto; min-width: 170px; padding: 9px 10px; }
+.user-pick.need select { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.corr-who { font-size: 13px; color: var(--muted); margin-top: 10px; }
+#corrBtn:disabled { opacity: .45; cursor: not-allowed; }

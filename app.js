@@ -139,6 +139,7 @@ function initUI() {
   let start = null;
   try { start = sessionStorage.getItem("startTab"); sessionStorage.removeItem("startTab"); } catch (e) {}
   setupHome();
+  updateUserState();
   showTab(start === "tr" ? "tr" : "home");
 }
 
@@ -340,8 +341,36 @@ $("enIn").addEventListener("input", () => { updateCount(); store("draft", $("enI
 
 function fail(msg) { $("trError").replaceChildren(el("div", "banner err", msg)); }
 
+// ---- Who is translating (remembered on this device) ------------------------------
+// The same name is used for corrections; Sister Hahn can translate but not send corrections.
+const NO_CORRECTIONS = ["Sister Hahn"];
+let busy = false;
+const currentUser = () => $("userSel").value;
+function updateUserState() {
+  const user = currentUser();
+  $("userSel").closest(".user-pick").classList.toggle("need", !user);
+  $("goBtn").disabled = busy || !user;
+  $("goBtn").title = user ? "" : "Choose your name first";
+  const canCorrect = !!user && !NO_CORRECTIONS.includes(user);
+  $("corrBtn").disabled = !canCorrect;
+  $("corrBtn").title = !user ? "Choose your name first" : canCorrect ? "" : "Corrections aren't available for this user";
+  if (!canCorrect && correcting) setCorrecting(false);
+}
+$("userSel").value = ["Gauv Meng", "Meix Waah", "Yauz-Seng", "Zanx Jiemh", "Sister Hahn"].includes(load("user")) ? load("user") : "";
+$("userSel").onchange = () => { store("user", currentUser() || null); updateUserState(); };
+
+// Each translation is also logged to the "Usage" tab of the Google Sheet.
+function logUsage(rec) {
+  const cfg = D.corrections || {};
+  if (!cfg.url) return;
+  const body = JSON.stringify({ token: cfg.token, kind: "usage", ...rec });
+  fetch(cfg.url, { method: "POST", body })
+    .catch(() => fetch(cfg.url, { method: "POST", mode: "no-cors", body }).catch(() => {}));
+}
+
 $("goBtn").onclick = async () => {
   const text = $("enIn").value.trim();
+  if (!currentUser()) { $("userSel").focus(); return; }
   if (!text) { $("enIn").focus(); return; }
   $("trError").replaceChildren();
   if (!D.apiKey) { fail("Translation isn't set up yet (no API key). Dictionary lookups still work."); return; }
@@ -360,6 +389,7 @@ $("goBtn").onclick = async () => {
   const toSend = paras.length > 1
     ? "The English is split into numbered paragraphs ([1], [2], …). Translate every paragraph and start each Mienh paragraph with the same number in brackets, one Mienh paragraph per number, so the two stay paired.\n\n" + paras.map((x, i) => `[${i + 1}] ${x}`).join("\n\n")
     : text;
+  busy = true;
   $("goBtn").disabled = true;
   $("resetBtn").disabled = true;
   const started = Date.now();
@@ -420,6 +450,11 @@ $("goBtn").onclick = async () => {
     addRun({ t: new Date().toISOString(), usd: cost, model: chosenModel, effort: chosenEffort, words: nEnglish,
       inTok: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
       outTok: u.output_tokens || 0, notes: wantNotes, notesTok, notesUsd });
+    logUsage({ user: currentUser(), words: nEnglish, paragraphs: paras.length, model: modelName(chosenModel),
+      effort: chosenEffort,
+      inTok: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
+      outTok: u.output_tokens || 0, notes: wantNotes, notesTok, notesUsd: Number(notesUsd.toFixed(5)),
+      usd: Number(cost.toFixed(5)), seconds: Math.round((Date.now() - started) / 1000) });
     $("trMeta").textContent = `Cost about ${money(cost)} (${modelName(chosenModel)}, ${chosenEffort} effort)` +
       (wantNotes ? ` · notes ≈ ${notesTok} tokens (${money(notesUsd)})` : "") +
       ` · ${nWords} words looked up, ${nMissing} not in the dictionary` +
@@ -437,7 +472,8 @@ $("goBtn").onclick = async () => {
   } finally {
     clearInterval(tick);
     $("trDots").hidden = true;
-    $("goBtn").disabled = false;
+    busy = false;
+    updateUserState();
     $("resetBtn").disabled = false;
   }
 };
@@ -837,7 +873,7 @@ function setCorrecting(on) {
   if (!on) closePop();
 }
 $("corrBtn").onclick = () => {
-  if (!correcting && !$("mienOut").value.trim()) return;
+  if (!correcting && (!$("mienOut").value.trim() || $("corrBtn").disabled)) return;
   setCorrecting(!correcting);
 };
 $("sideChk").addEventListener("change", () => { if (correcting) setCorrecting(true); });
@@ -871,7 +907,7 @@ function openPop(info) {
   $("corrText").value = "";
   $("corrBetter").value = "";
   $("corrBetterWrap").hidden = info.english;
-  $("corrWho").value = load("corrWho") || "";
+  $("corrWho").textContent = currentUser();
   $("corrMsg").textContent = ""; $("corrMsg").className = "corr-msg";
   pop.hidden = false;
   placePop(info.range.getBoundingClientRect());
@@ -918,10 +954,9 @@ $("corrPop").addEventListener("submit", async (e) => {
   const msg = $("corrMsg");
   const cfg = D.corrections || {};
   if (!cfg.url) { msg.textContent = "Corrections aren't connected yet. Ask Logan to finish the setup."; msg.className = "corr-msg err"; return; }
-  const text = $("corrText").value.trim(), who = $("corrWho").value;
+  const text = $("corrText").value.trim(), who = currentUser();
   if (!text) { msg.textContent = "Please type the correction."; msg.className = "corr-msg err"; $("corrText").focus(); return; }
-  if (!who) { msg.textContent = "Please choose your name."; msg.className = "corr-msg err"; $("corrWho").focus(); return; }
-  store("corrWho", who);
+  if (!who || NO_CORRECTIONS.includes(who)) { msg.textContent = "Choose your name in the User box first."; msg.className = "corr-msg err"; return; }
   const info = corrInfo, range = corrRange;
   const payload = {
     token: cfg.token, who,
@@ -947,7 +982,7 @@ $("corrPop").addEventListener("submit", async (e) => {
       try { const m = document.createElement("mark"); m.className = "sent"; range.surroundContents(m); } catch (x) {}
       window.getSelection().removeAllRanges();
       closePop();
-      toast(who === "Brandon" ? "Thanks! Sent for Logan to review." : "Thanks! Your correction was sent.");
+      toast(who === "Zanx Jiemh" ? "Thanks! Sent for Yauz-Seng to review." : "Thanks! Your correction was sent.");
     }
   } catch (err) {
     msg.textContent = `Couldn't send it (${err.message}). Check the connection and try again.`;
