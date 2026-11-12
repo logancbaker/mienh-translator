@@ -358,3 +358,5 @@ textarea#mienOut { min-height: 360px; max-height: min(70vh, 900px); font-size: 1
   .hero-title .w { opacity: 1; transform: none; }
   .bg span { animation: none; }
 }
+.chip.install { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.chip.install:hover { filter: brightness(1.05); }

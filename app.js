@@ -622,6 +622,27 @@ $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
 $("tab-tr").onclick = () => { showTab("tr"); $("enIn").focus(); };
 
+// ---- Install as an app (Android / desktop Chrome) ------------------------------
+// The service worker makes the site installable; Chrome then offers a real app
+// install (own icon, full screen) instead of a browser shortcut.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+let installEvent = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installEvent = e;
+  $("installBtn").hidden = false;
+});
+$("installBtn").onclick = async () => {
+  if (!installEvent) return;
+  installEvent.prompt();
+  await installEvent.userChoice.catch(() => {});
+  installEvent = null;
+  $("installBtn").hidden = true;
+};
+window.addEventListener("appinstalled", () => { $("installBtn").hidden = true; });
+
 (async () => {
   const saved = load("pw");
   if (saved) {
