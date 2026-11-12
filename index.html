@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=5681f4db1c">
+<link rel="stylesheet" href="style.css?v=1dcf1369e9">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -124,7 +124,12 @@
               </select></span>
             </div>
             <label class="check inline"><input type="checkbox" id="notesChk" checked> Include “Words to check” notes</label>
-            <div class="row">
+            <div class="need-user" id="needUser" hidden>Select a user before translation can begin.</div>
+            <div class="row go-row">
+              <span class="actions">
+                <button class="btn" id="goBtn" disabled title="Choose your name first">Translate</button>
+                <button class="btn secondary" id="resetBtn" type="button">Reset</button>
+              </span>
               <span class="user-pick"><label for="userSel">User</label>
               <select id="userSel" aria-label="Who is translating">
                 <option value="">Choose your name</option>
@@ -134,8 +139,6 @@
                 <option>Zanx Jiemh</option>
                 <option>Sister Hahn</option>
               </select></span>
-              <button class="btn" id="goBtn" disabled title="Choose your name first">Translate</button>
-              <button class="btn secondary" id="resetBtn" type="button">Reset</button>
               <span class="dots" id="trDots" hidden aria-hidden="true"><i></i><i></i><i></i></span>
               <span class="status" id="trStatus"></span>
               <span class="spacer"></span>
@@ -194,7 +197,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=5681f4db1c"></script>
+<script type="module" src="app.js?v=1dcf1369e9"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>

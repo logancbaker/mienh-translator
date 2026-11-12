@@ -349,6 +349,7 @@ const currentUser = () => $("userSel").value;
 function updateUserState() {
   const user = currentUser();
   $("userSel").closest(".user-pick").classList.toggle("need", !user);
+  $("needUser").hidden = !!user;
   $("goBtn").disabled = busy || !user;
   $("goBtn").title = user ? "" : "Choose your name first";
   const canCorrect = !!user && !NO_CORRECTIONS.includes(user);
