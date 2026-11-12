@@ -405,20 +405,21 @@ textarea#mienOut { min-height: 360px; max-height: min(70vh, 900px); font-size: 1
 .correcting .side-table { outline: 1px dashed var(--accent); outline-offset: -1px; }
 mark.sent { background: none; color: inherit; text-decoration: underline wavy var(--green); text-underline-offset: 3px; }
 .corr-pop {
-  position: absolute; z-index: 50; width: min(500px, calc(100vw - 24px));
-  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px 20px;
+  position: absolute; z-index: 50; width: min(660px, calc(100vw - 24px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 22px 26px 24px;
   box-shadow: 0 12px 40px rgba(0,0,0,.22); animation: pop .25s ease both;
 }
 .corr-pop.sheet { position: fixed; left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; border-radius: 16px 16px 0 0; }
 .corr-pop-head { display: flex; justify-content: space-between; align-items: center; }
 .corr-x { appearance: none; border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); cursor: pointer; padding: 2px 6px; }
-.corr-sel { margin: 8px 0 4px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 6px; font-size: 16px; max-height: 6em; overflow: auto; }
-.corr-pop label { display: block; font-size: 14px; font-weight: 650; margin: 14px 0 6px; }
-.corr-pop .kicker { font-size: 13px; }
+.corr-sel { margin: 10px 0 4px; padding: 10px 14px; border-left: 4px solid var(--accent); background: var(--bg); border-radius: 8px; font-size: 18px; max-height: 7em; overflow: auto; }
+.corr-pop label { display: block; font-size: 16px; font-weight: 650; margin: 16px 0 8px; }
+.corr-pop .kicker { font-size: 14px; }
+.corr-pop .corr-who { font-size: 15px; }
 .corr-pop .opt-l { font-weight: 400; color: var(--muted); }
-.corr-pop textarea { min-height: 0; font-size: 17px; line-height: 1.5; padding: 10px 12px; }
+.corr-pop textarea { min-height: 0; font-size: 19px; line-height: 1.5; padding: 12px 14px; }
 .corr-pop .row { margin-top: 14px; }
-.corr-pop .btn.small { padding: 10px 18px; font-size: 15px; }
+.corr-pop .btn.small { padding: 12px 22px; font-size: 16px; }
 .corr-pop select { padding: 8px 10px; }
 .corr-msg { font-size: 13px; color: var(--muted); min-height: 0; margin-top: 6px; }
 .corr-msg.err { color: var(--red); }
