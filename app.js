@@ -318,6 +318,7 @@ $("goBtn").onclick = async () => {
   $("notesBox").hidden = true;
   $("trMeta").textContent = "";
   $("mienOut").value = "";
+  $("mienOut").style.height = "";
 
   try {
     const { context, nWords, nMissing } = requestContext(text);
@@ -336,7 +337,14 @@ $("goBtn").onclick = async () => {
       ] }],
     });
     let soFar = "";
-    stream.on("text", (t) => { soFar += t; $("mienOut").value = liveTranslation(soFar); fitMien(); });
+    stream.on("text", (t) => {
+      const box = $("mienOut");
+      const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+      soFar += t;
+      box.value = liveTranslation(soFar);
+      fitMien();
+      if (atEnd) box.scrollTop = box.scrollHeight;
+    });
     const msg = await stream.finalMessage();
     if (msg.stop_reason === "refusal") throw new Error("Claude declined to translate this text.");
     const out = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
@@ -583,8 +591,9 @@ $("resetBtn").onclick = () => {
 // The Mienh box grows to fit its text, so long translations spill down the page.
 function fitMien() {
   const t = $("mienOut");
-  t.style.height = "auto";
-  t.style.height = `${t.scrollHeight + 2}px`;
+  const cap = parseFloat(getComputedStyle(t).maxHeight) || Infinity;
+  const need = Math.min(t.scrollHeight + 2, cap);
+  if (need > t.offsetHeight) t.style.height = `${need}px`;
 }
 $("mienOut").addEventListener("input", fitMien);
 window.addEventListener("resize", () => { if (!$("trResult").hidden) fitMien(); });
