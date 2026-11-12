@@ -284,6 +284,7 @@ $("goBtn").onclick = async () => {
   if (text.length > D.maxChars) { fail(`That's too long. The limit is ${D.maxChars.toLocaleString()} characters; split it into parts.`); return; }
 
   $("goBtn").disabled = true;
+  $("clearBtn").disabled = true;
   const started = Date.now();
   const tick = setInterval(() => {
     const s = Math.round((Date.now() - started) / 1000);
@@ -336,7 +337,23 @@ $("goBtn").onclick = async () => {
   } finally {
     clearInterval(tick);
     $("goBtn").disabled = false;
+    $("clearBtn").disabled = false;
   }
+};
+
+// Clear the English, the translation, notes and messages.
+$("clearBtn").onclick = () => {
+  $("enIn").value = "";
+  store("draft", null);
+  updateCount();
+  $("mienOut").value = "";
+  $("notes").replaceChildren();
+  $("notesBox").hidden = true;
+  $("trMeta").textContent = "";
+  $("trStatus").textContent = "";
+  $("trError").replaceChildren();
+  $("trResult").hidden = true;
+  $("enIn").focus();
 };
 
 $("copyBtn").onclick = async () => {
