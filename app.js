@@ -83,6 +83,7 @@ function init(data) {
   SENTS.forEach((s, i) => index(SENT_INDEX, i, s.nen));
   STOP = new Set(data.stopwords);
   $("built").textContent = `Data updated ${data.built}`;
+  setupOptions();
   $("loading").hidden = true;
   $("unlock").hidden = true;
   $("app").hidden = false;
@@ -283,6 +284,8 @@ $("goBtn").onclick = async () => {
   if (!D.apiKey) { fail("Translation isn't set up yet (no API key). Dictionary lookups still work."); return; }
   if (text.length > D.maxChars) { fail(`That's too long. The limit is ${D.maxChars.toLocaleString()} characters; split it into parts.`); return; }
 
+  const chosenModel = D.models[$("modelSel").value] ? $("modelSel").value : D.model;
+  const chosenEffort = $("effortSel").value === "medium" ? "medium" : "high";
   $("goBtn").disabled = true;
   $("resetBtn").disabled = true;
   const started = Date.now();
@@ -300,11 +303,11 @@ $("goBtn").onclick = async () => {
     const { context, nWords, nMissing } = requestContext(text);
     const client = new Anthropic({ apiKey: D.apiKey, dangerouslyAllowBrowser: true });
     const stream = client.beta.messages.stream({
-      model: D.model,
+      model: chosenModel,
       max_tokens: 64000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      output_config: { effort: "high" },
+      output_config: { effort: chosenEffort },
       system: [{ type: "text", text: staticSystem(), cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: [
         { type: "text", text: context },
@@ -320,10 +323,11 @@ $("goBtn").onclick = async () => {
     const notes = tag(out, "notes").split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
     $("notes").replaceChildren(...notes.map((n) => el("li", null, n)));
     $("notesBox").hidden = notes.length === 0;
-    const u = msg.usage, P = D.prices;
+    const u = msg.usage, P = (D.models[chosenModel] || {}).prices || D.prices;
     const cost = ((u.input_tokens || 0) * P.input + (u.output_tokens || 0) * P.output +
       (u.cache_read_input_tokens || 0) * P.cache_read + (u.cache_creation_input_tokens || 0) * P.cache_write) / 1e6;
-    $("trMeta").textContent = `Cost about $${cost.toFixed(2)} · ${nWords} words looked up, ${nMissing} not in the dictionary` +
+    addToTotal(cost);
+    $("trMeta").textContent = `Cost about $${cost.toFixed(2)} (${(D.models[chosenModel] || {}).label || chosenModel}, ${chosenEffort} effort) · ${nWords} words looked up, ${nMissing} not in the dictionary` +
       (msg.stop_reason === "max_tokens" ? " · The answer was cut off: try a shorter text." : "");
     $("trStatus").textContent = "Done.";
   } catch (e) {
@@ -340,6 +344,41 @@ $("goBtn").onclick = async () => {
     $("resetBtn").disabled = false;
   }
 };
+
+// ---- Model / effort choice and running cost total (kept on this device) ------
+function setupOptions() {
+  const sel = $("modelSel");
+  sel.replaceChildren(...Object.entries(D.models).map(([id, m]) => {
+    const o = el("option", null, m.label); o.value = id; return o;
+  }));
+  const m = load("model"), e = load("effort");
+  sel.value = m && D.models[m] ? m : D.model;
+  $("effortSel").value = e === "medium" ? "medium" : "high";
+  sel.onchange = () => store("model", sel.value);
+  $("effortSel").onchange = () => store("effort", $("effortSel").value);
+  showTotal();
+}
+function getTotal() {
+  try { return JSON.parse(load("costTotal")) || { usd: 0, n: 0, since: null }; }
+  catch (e) { return { usd: 0, n: 0, since: null }; }
+}
+function addToTotal(cost) {
+  const t = getTotal();
+  t.usd += cost; t.n += 1; t.since = t.since || new Date().toISOString().slice(0, 10);
+  store("costTotal", JSON.stringify(t));
+  showTotal();
+}
+function showTotal() {
+  const t = getTotal(), box = $("costTotal");
+  if (!t.n) { box.replaceChildren(); return; }
+  const btn = el("button", null, "Reset total");
+  btn.type = "button";
+  btn.onclick = () => {
+    if (confirm("Set the running total back to $0.00?")) { store("costTotal", null); showTotal(); }
+  };
+  box.replaceChildren(el("span", null,
+    `Running total on this device: $${t.usd.toFixed(2)} for ${t.n} translation${t.n === 1 ? "" : "s"} since ${t.since}`), btn);
+}
 
 // Reset: forget the English draft and reload the page, which clears the
 // translation, notes and messages too. The password and tab stay remembered.

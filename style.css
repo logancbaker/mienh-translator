@@ -121,3 +121,8 @@ textarea#mienOut { min-height: 260px; }
 .foot { color: var(--muted); font-size: 12px; margin-top: 28px; text-align: center; }
 .foot button { appearance: none; border: 0; background: none; color: var(--muted); text-decoration: underline; font: inherit; cursor: pointer; padding: 0; }
 .live { white-space: pre-wrap; }
+.row.options { margin-top: 12px; gap: 8px 10px; }
+.row.options label { font-size: 14px; color: var(--muted); }
+.row.options select { width: auto; flex: 1 1 160px; padding: 8px 10px; }
+.total { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.total button { appearance: none; border: 0; background: none; color: var(--muted); text-decoration: underline; font: inherit; cursor: pointer; padding: 0; }

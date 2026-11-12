@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Mienh Translator</title>
-<link rel="stylesheet" href="style.css?v=2e61cc66a2">
+<link rel="stylesheet" href="style.css?v=c67c46edbf">
 </head>
 <body>
 <div class="wrap">
@@ -54,6 +54,15 @@
       <div class="card">
         <label for="enIn" class="meta" style="display:block;margin-top:0">English</label>
         <textarea id="enIn" placeholder="Paste English text here"></textarea>
+        <div class="row options">
+          <label for="modelSel">Model</label>
+          <select id="modelSel"></select>
+          <label for="effortSel">Effort</label>
+          <select id="effortSel">
+            <option value="high">High (more careful)</option>
+            <option value="medium">Medium (faster, cheaper)</option>
+          </select>
+        </div>
         <div class="row">
           <button class="btn" id="goBtn">Translate</button>
           <button class="btn secondary" id="resetBtn" type="button">Reset</button>
@@ -63,6 +72,7 @@
         </div>
         <div id="trError"></div>
       </div>
+      <div class="meta total" id="costTotal"></div>
 
       <div id="trResult" hidden>
         <h2 class="section">Mienh</h2>
@@ -83,6 +93,6 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=2e61cc66a2"></script>
+<script type="module" src="app.js?v=c67c46edbf"></script>
 </body>
 </html>
