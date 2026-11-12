@@ -52,6 +52,15 @@ $("unlock").addEventListener("submit", async (e) => {
   $("unlockBtn").textContent = "Open";
 });
 
+$("pwToggle").onclick = () => {
+  const show = $("pw").type === "password";
+  $("pw").type = show ? "text" : "password";
+  $("pwToggle").textContent = show ? "Hide" : "Show";
+  $("pwToggle").setAttribute("aria-pressed", String(show));
+  $("pwToggle").setAttribute("aria-label", show ? "Hide password" : "Show password");
+  $("pw").focus();
+};
+
 $("lockBtn").onclick = () => { store("pw", null); location.reload(); };
 
 // ---- Data and search (same rules as scripts/lookup.py and webapp/data.py) ------
@@ -294,6 +303,8 @@ $("goBtn").onclick = async () => {
 
   const chosenModel = D.models[$("modelSel").value] ? $("modelSel").value : D.model;
   const chosenEffort = $("effortSel").value === "medium" ? "medium" : "high";
+  const wantNotes = $("notesChk").checked;
+  const nEnglish = text.split(/\s+/).filter(Boolean).length;
   $("goBtn").disabled = true;
   $("resetBtn").disabled = true;
   const started = Date.now();
@@ -320,7 +331,8 @@ $("goBtn").onclick = async () => {
       system: [{ type: "text", text: staticSystem(), cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: [
         { type: "text", text: context },
-        { type: "text", text: "Translate this English into Iu-Mienh:\n\n" + text },
+        { type: "text", text: (wantNotes ? "" : "Skip the notes this time: answer with only the <translation> section.\n\n") +
+          "Translate this English into Iu-Mienh:\n\n" + text },
       ] }],
     });
     let soFar = "";
@@ -330,14 +342,22 @@ $("goBtn").onclick = async () => {
     const out = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
     $("mienOut").value = tag(out, "translation") || out.trim();
     fitMien();
-    const notes = tag(out, "notes").split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
+    const notesText = wantNotes ? tag(out, "notes") : "";
+    const notes = notesText.split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
     $("notes").replaceChildren(...notes.map((n) => el("li", null, n)));
     $("notesBox").hidden = notes.length === 0;
     const u = msg.usage, P = (D.models[chosenModel] || {}).prices || D.prices;
     const cost = ((u.input_tokens || 0) * P.input + (u.output_tokens || 0) * P.output +
       (u.cache_read_input_tokens || 0) * P.cache_read + (u.cache_creation_input_tokens || 0) * P.cache_write) / 1e6;
-    addToTotal(cost);
-    $("trMeta").textContent = `Cost about $${cost.toFixed(2)} (${(D.models[chosenModel] || {}).label || chosenModel}, ${chosenEffort} effort) · ${nWords} words looked up, ${nMissing} not in the dictionary` +
+    // The notes' share of the cost: their text, at about 4 characters a token, at the output price.
+    const notesTok = wantNotes ? Math.round(notesText.length / 4) : 0;
+    const notesUsd = (notesTok * P.output) / 1e6;
+    addRun({ t: new Date().toISOString(), usd: cost, model: chosenModel, effort: chosenEffort, words: nEnglish,
+      inTok: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
+      outTok: u.output_tokens || 0, notes: wantNotes, notesTok, notesUsd });
+    $("trMeta").textContent = `Cost about ${money(cost)} (${modelName(chosenModel)}, ${chosenEffort} effort)` +
+      (wantNotes ? ` · notes ≈ ${notesTok} tokens (${money(notesUsd)})` : "") +
+      ` · ${nWords} words looked up, ${nMissing} not in the dictionary` +
       (msg.stop_reason === "max_tokens" ? " · The answer was cut off: try a shorter text." : "");
     $("trStatus").textContent = "Done!";
     celebrate();
@@ -368,63 +388,88 @@ function setupOptions() {
   $("effortSel").value = e === "medium" ? "medium" : "high";
   sel.onchange = () => store("model", sel.value);
   $("effortSel").onchange = () => store("effort", $("effortSel").value);
+  $("notesChk").checked = load("notes") !== "off";
+  $("notesChk").onchange = () => store("notes", $("notesChk").checked ? null : "off");
   showTotal();
 }
-// History of translation costs on this device: [{d: "YYYY-MM-DD", usd}]
-function getHistory() {
+// Each translation on this device: {t, usd, model, effort, words, inTok, outTok, notesTok, notes}
+function getRuns() {
   try {
     const h = JSON.parse(load("costHistory"));
     if (Array.isArray(h)) return h;
   } catch (e) {}
-  // Carry over the older one-number total, if there is one.
-  try {
+  try {  // the older one-number total becomes a single grey "earlier" bar
     const t = JSON.parse(load("costTotal"));
-    if (t && t.n) return [{ d: t.since || new Date().toISOString().slice(0, 10), usd: t.usd, n: t.n }];
+    if (t && t.n) return [{ t: t.since || null, usd: t.usd, n: t.n }];
   } catch (e) {}
   return [];
 }
-function addToTotal(cost) {
-  const h = getHistory();
-  h.push({ d: new Date().toISOString().slice(0, 10), usd: cost });
+function addRun(run) {
+  const h = getRuns();
+  h.push(run);
   store("costHistory", JSON.stringify(h));
   store("costTotal", null);
   showTotal(true);
 }
+const money = (x) => (x < 0.01 && x > 0 ? `$${x.toFixed(3)}` : `$${x.toFixed(2)}`);
+const modelName = (id) => (id && id.includes("sonnet") ? "Sonnet 5.5" : id ? "Opus 5.5" : "");
+function runDetails(r, i) {
+  const when = r.t ? new Date(r.t) : null;
+  const date = when && !isNaN(when) ? when.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+  if (r.n) return [`<b>${money(r.usd)}</b> · ${r.n} earlier translations`, "Recorded before per-translation details were kept."];
+  if (!r.words && r.words !== 0) return [`<b>${money(r.usd)}</b> · translation ${i + 1}`, date || "Earlier translation"];
+  const lines = [
+    `<b>${money(r.usd)}</b> · translation ${i + 1}${date ? ` · ${date}` : ""}`,
+    `${r.words.toLocaleString()} English words · ${modelName(r.model)}, ${r.effort} effort`,
+    `Tokens: ${(r.inTok || 0).toLocaleString()} in · ${(r.outTok || 0).toLocaleString()} out`,
+  ];
+  lines.push(r.notes === false ? "Words to check: off"
+    : `Words to check: about ${(r.notesTok || 0).toLocaleString()} tokens (${money(r.notesUsd || 0)})`);
+  return lines;
+}
 function showTotal(bump) {
-  const h = getHistory();
+  const h = getRuns();
   const total = h.reduce((a, x) => a + x.usd, 0);
   const n = h.reduce((a, x) => a + (x.n || 1), 0);
-  $("spendTotal").textContent = `$${total.toFixed(2)}`;
+  $("spendTotal").textContent = money(total);
+  const since = h.length && h[0].t ? new Date(h[0].t) : null;
   $("spendSub").textContent = n
-    ? `${n} translation${n === 1 ? "" : "s"} since ${h[0].d} · about $${(total / n).toFixed(2)} each`
+    ? `Running total for ${n} translation${n === 1 ? "" : "s"}${since && !isNaN(since) ? ` since ${since.toLocaleDateString([], { month: "short", day: "numeric" })}` : ""} · about ${money(total / n)} each`
     : "No translations yet. Your first one will show up here.";
   $("spendReset").hidden = !n;
   if (bump) { const t = $("spendTotal"); t.classList.remove("bump"); void t.offsetWidth; t.classList.add("bump"); }
-  drawChart(h);
+  drawBars(h);
 }
-function drawChart(h) {
-  const svg = $("spendChart"), W = 240, H = 90, NS = "http://www.w3.org/2000/svg";
-  const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-  svg.replaceChildren();
-  const defs = mk("defs", {});
-  const g = mk("linearGradient", { id: "spendFill", x1: 0, y1: 0, x2: 0, y2: 1 });
-  g.append(mk("stop", { offset: "0%", "stop-color": "var(--red)", "stop-opacity": ".35" }),
-           mk("stop", { offset: "100%", "stop-color": "var(--red)", "stop-opacity": "0" }));
-  defs.append(g);
-  svg.append(defs, mk("line", { class: "base", x1: 0, y1: H - 2, x2: W, y2: H - 2 }));
-  if (!h.length) { svg.append(mk("line", { class: "empty-line", x1: 0, y1: H / 2, x2: W, y2: H / 2 })); return; }
-  let cum = 0;
-  const pts = [[0, 0]].concat(h.map((x, i) => [i + 1, (cum += x.usd)]));
-  const max = cum || 1, last = pts.length - 1;
-  const xy = pts.map(([i, v]) => [(i / last) * W, H - 4 - (v / max) * (H - 12)]);
-  const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const grp = mk("g", { class: "reveal" });
-  grp.append(mk("path", { class: "area", d: `${line} L${W},${H - 2} L0,${H - 2} Z` }),
-             mk("path", { class: "line", d: line }));
-  svg.append(grp);
-  const title = mk("title", {});
-  title.textContent = h.map((x) => `${x.d}: $${x.usd.toFixed(2)}`).join("\n");
-  svg.append(title);
+function drawBars(h) {
+  const box = $("spendBars"), tip = $("spendTip");
+  tip.hidden = true;
+  box.replaceChildren();
+  if (!h.length) { $("spendMax").textContent = ""; box.append(el("div", "none", "Each translation will appear here as a bar.")); return; }
+  const max = Math.max(...h.map((r) => r.usd), 0.01);
+  $("spendMax").textContent = `tallest ${money(max)}`;
+  const show = (bar, r, i) => {
+    box.querySelectorAll(".bar.on").forEach((b) => b.classList.remove("on"));
+    bar.classList.add("on");
+    tip.innerHTML = runDetails(r, i).join("<br>");
+    tip.hidden = false;
+  };
+  h.forEach((r, i) => {
+    const bar = el("div", "bar" + (r.n ? " old" : r.model && r.model.includes("sonnet") ? " sonnet" : ""));
+    bar.style.height = `${Math.max(3, (r.usd / max) * 100)}%`;
+    bar.style.setProperty("--i", i);
+    bar.tabIndex = 0;
+    bar.setAttribute("aria-label", runDetails(r, i).join(". ").replace(/<[^>]+>/g, ""));
+    bar.onmouseenter = bar.onfocus = bar.onclick = () => show(bar, r, i);
+    box.append(bar);
+  });
+  box.onmouseleave = () => { tip.hidden = true; box.querySelectorAll(".bar.on").forEach((b) => b.classList.remove("on")); };
+  box.scrollLeft = box.scrollWidth;
+  if (!document.getElementById("spendLegend")) {
+    const lg = el("div", "legend");
+    lg.id = "spendLegend";
+    lg.innerHTML = '<span><i style="background:linear-gradient(var(--red),var(--pink))"></i>Opus 5.5</span><span><i style="background:linear-gradient(var(--indigo),#5b6fd0)"></i>Sonnet 5.5</span>';
+    box.after(lg);
+  }
 }
 $("spendReset").onclick = () => {
   if (confirm("Set this device's spending total back to $0.00?")) {
@@ -562,7 +607,6 @@ function showTab(name) {
       panel.querySelectorAll(".rise").forEach((n) => { n.style.animation = "none"; void n.offsetWidth; n.style.animation = ""; });
     }
   }
-  document.body.classList.toggle("wide", name === "tr");
   if (name === "tr") { showTotal(); if (!$("trResult").hidden) fitMien(); }
 }
 $("tab-home").onclick = () => showTab("home");

@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Mienh Translator</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f2a5a'/%3E%3Cpath d='M16 5l11 11-11 11L5 16z' fill='%23d63b2f'/%3E%3Cpath d='M16 10l6 6-6 6-6-6z' fill='%23f2b632'/%3E%3Cpath d='M16 13.5l2.5 2.5-2.5 2.5-2.5-2.5z' fill='%231f2a5a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=b91ea2cf6d">
+<link rel="stylesheet" href="style.css?v=f9bb050027">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -19,7 +19,10 @@
     <div class="meta">Private. Enter the password to open.</div>
     <div id="unlockErr" class="banner err" hidden></div>
     <label for="pw">Password</label>
-    <input id="pw" type="password" autocomplete="current-password" required>
+    <div class="pw-wrap">
+      <input id="pw" type="password" autocomplete="current-password" required>
+      <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password" aria-pressed="false">Show</button>
+    </div>
     <label class="check"><input type="checkbox" id="remember" checked> Remember on this device</label>
     <button class="btn" type="submit" id="unlockBtn">Open</button>
   </form>
@@ -113,6 +116,7 @@
                 <option value="medium">Medium (faster, cheaper)</option>
               </select></span>
             </div>
+            <label class="check inline"><input type="checkbox" id="notesChk" checked> Include “Words to check” notes</label>
             <div class="row">
               <button class="btn" id="goBtn">Translate</button>
               <button class="btn secondary" id="resetBtn" type="button">Reset</button>
@@ -145,7 +149,9 @@
             <div class="kicker">Spending on this device</div>
             <div class="spend-total"><span id="spendTotal">$0.00</span></div>
             <div class="spend-sub" id="spendSub">No translations yet</div>
-            <svg class="spend-chart" id="spendChart" viewBox="0 0 240 90" preserveAspectRatio="none" role="img" aria-label="Running total of translation costs"></svg>
+            <div class="spend-chart-head"><span>Cost of each translation</span><span id="spendMax"></span></div>
+            <div class="bars" id="spendBars" role="img" aria-label="Cost of each translation"></div>
+            <div class="bar-tip" id="spendTip" hidden></div>
             <div class="spend-foot">
               <span class="spend-note">Only this phone or computer. Everyone's total is in the Anthropic Console.</span>
               <button class="chip" id="spendReset" type="button">Reset total</button>
@@ -158,6 +164,6 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=b91ea2cf6d"></script>
+<script type="module" src="app.js?v=f9bb050027"></script>
 </body>
 </html>

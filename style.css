@@ -54,8 +54,7 @@ body {
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
 }
-.wrap { position: relative; max-width: 1080px; margin: 0 auto; padding: 0 16px 48px; transition: max-width .3s ease; }
-body.wide .wrap { max-width: none; padding: 0 clamp(16px, 2.5vw, 40px) 48px; }
+.wrap { position: relative; max-width: 1320px; margin: 0 auto; padding: 0 16px 48px; }
 
 /* Soft drifting color blobs behind everything */
 .bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
@@ -279,12 +278,34 @@ textarea#mienOut { min-height: 360px; font-size: 17px; line-height: 1.6; overflo
 @keyframes fly { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
 
 /* ---- Translate layout with the spending panel on the right ---- */
-.tr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; align-items: start; }
+.tr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .tr-side { position: sticky; top: 16px; }
 @media (max-width: 860px) { .tr-grid { grid-template-columns: 1fr; } .tr-side { position: static; } }
 .spend-total { font-size: 34px; font-weight: 800; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .spend-sub { color: var(--muted); font-size: 13px; }
-.spend-chart { display: block; width: 100%; height: 90px; margin: 12px 0 8px; overflow: visible; }
+.spend-chart-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin: 14px 0 6px; }
+.bars {
+  position: relative; display: flex; align-items: flex-end; gap: 3px; height: 110px;
+  padding-bottom: 1px; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden;
+}
+.bars .bar {
+  flex: 1 0 6px; max-width: 26px; min-height: 3px; border-radius: 4px 4px 0 0; cursor: pointer;
+  background: linear-gradient(var(--red), var(--pink)); opacity: .85;
+  transform-origin: bottom; animation: grow .6s cubic-bezier(.2,.8,.2,1) both;
+  animation-delay: calc(min(var(--i, 0), 30) * 25ms); transition: opacity .15s;
+}
+.bars .bar.sonnet { background: linear-gradient(var(--indigo), #5b6fd0); }
+.bars .bar.old { background: var(--line); }
+.bars .bar:hover, .bars .bar.on { opacity: 1; outline: 2px solid var(--gold); outline-offset: 1px; }
+@keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.bars .none { align-self: center; width: 100%; text-align: center; color: var(--muted); font-size: 12px; }
+.legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); margin: 6px 0 2px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.bar-tip {
+  margin-top: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; font-size: 12.5px; line-height: 1.45;
+}
+.bar-tip b { font-size: 14px; }
 .spend-chart .area { fill: url(#spendFill); }
 .spend-chart .line { fill: none; stroke: var(--red); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .spend-chart .reveal { animation: reveal 1.2s cubic-bezier(.2,.8,.2,1) both; }
@@ -304,6 +325,15 @@ textarea#mienOut { min-height: 360px; font-size: 17px; line-height: 1.6; overflo
 .login .btn { width: 100%; margin-top: 18px; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-top: 14px; color: var(--muted); font-weight: 400 !important; }
 .check input { width: auto; }
+.check.inline { margin-top: 10px; font-size: 14px; cursor: pointer; }
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 70px; }
+.pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  appearance: none; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 650;
+  padding: 6px 8px; border-radius: 8px; cursor: pointer;
+}
+.pw-toggle:hover { color: var(--ink); background: var(--accent-soft); }
 .shake { animation: shake .4s; }
 @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
 
