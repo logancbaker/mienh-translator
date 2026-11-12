@@ -737,8 +737,9 @@ function renderSide() {
     hint.hidden = false;
   }
 }
-$("sideChk").checked = load("side") === "on";
-$("sideChk").onchange = () => { store("side", $("sideChk").checked ? "on" : null); renderSide(); };
+// On by default; turning it off is remembered on this device.
+$("sideChk").checked = load("side") !== "off";
+$("sideChk").onchange = () => { store("side", $("sideChk").checked ? null : "off"); renderSide(); };
 
 function today() { return new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" }); }
 
@@ -846,38 +847,28 @@ function toast(msg) {
   toast.timer = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
-function renderCorrView() {
-  $("corrView").replaceChildren(...pairs().map((r, i) => {
-    const p = el("p", "mi", r.mi);
-    p.dataset.i = i;
-    return p;
-  }).filter((p) => p.textContent));
-}
-
+// Corrections go one way only: highlight English, type how it should be said in Mienh.
+// That needs the side-by-side view, so correcting turns it on.
 function setCorrecting(on) {
+  if (on && !$("sideChk").checked) {
+    $("sideChk").checked = true;
+    store("side", null);
+    renderSide();
+  }
   correcting = on;
-  const side = $("sideChk").checked;
   $("corrBtn").setAttribute("aria-pressed", String(on));
   $("corrBtn").textContent = on ? "Done" : "✎ Suggest a correction";
   $("resultCard").classList.toggle("correcting", on);
   $("corrBanner").hidden = !on;
-  $("corrBanner").innerHTML = side
-    ? "Highlight <b>Mienh</b> to say what it means in English, or <b>English</b> to say how it should be in Mienh. Tap <b>Done</b> when finished."
-    : "Highlight the Mienh words you want to correct (press and hold on a phone). Tap <b>Done</b> when finished.";
-  if (side) {
-    $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on ? "false" : "true"; });
-  } else {
-    $("corrView").hidden = !on;
-    $("mienOut").hidden = on;
-    if (on) renderCorrView(); else fitMien();
-  }
+  $("corrBanner").innerHTML = "Highlight the <b>English</b> words, then type how they should be said in Mienh (press and hold on a phone). Tap <b>Done</b> when finished.";
+  $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on ? "false" : "true"; });
   if (!on) closePop();
 }
 $("corrBtn").onclick = () => {
   if (!correcting && (!$("mienOut").value.trim() || $("corrBtn").disabled)) return;
   setCorrecting(!correcting);
 };
-$("sideChk").addEventListener("change", () => { if (correcting) setCorrecting(true); });
+$("sideChk").addEventListener("change", () => { if (correcting && !$("sideChk").checked) setCorrecting(false); });
 
 function selectionInfo() {
   const sel = window.getSelection();
@@ -886,12 +877,11 @@ function selectionInfo() {
   if (!text) return null;
   const range = sel.getRangeAt(0);
   const node = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
-  const view = $("sideChk").checked ? $("sideBody") : $("corrView");
-  if (!view.contains(node)) return null;
-  const cell = node.closest("td, p");
-  if (!cell) return null;
-  const isEnglish = cell.matches("td.en");
-  const row = cell.closest("tr, p");
+  if (!$("sideBody").contains(node)) return null;
+  const cell = node.closest("td.en");  // only English can be highlighted
+  if (!cell || !cell.contains(range.endContainer)) return null;
+  const isEnglish = true;
+  const row = cell.closest("tr");
   const i = Number(row.dataset.i || 0);
   const pr = pairs()[i] || { mi: "", en: "" };
   return { text, range: range.cloneRange(), english: isEnglish, context_mien: pr.mi, context_english: pr.en };

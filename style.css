@@ -440,3 +440,7 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 .need-user + .go-row { margin-top: 6px; }
 .corr-who { font-size: 13px; color: var(--muted); margin-top: 10px; }
 #corrBtn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Correcting: only the English column can be highlighted */
+.correcting .side-table td.mi { -webkit-user-select: none; user-select: none; cursor: default; opacity: .6; }
+.correcting .side-table td.en { color: var(--ink); background: var(--accent-soft); }
