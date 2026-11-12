@@ -190,7 +190,7 @@ function runSearch() {
     : "";
   if (!r.entries.length && !r.sentences.length) { out.append(emptyState(q)); return; }
   if (r.entries.length) {
-    const card = el("div", "card"), ul = el("ul", "results");
+    const card = el("div", "card list"), ul = el("ul", "results entries");
     for (const e of r.entries) {
       const li = el("li"), head = el("div");
       head.append(el("span", "mien", e.mien));
@@ -198,7 +198,9 @@ function runSearch() {
       if (!e.book) head.append(el("span", "tag", "not in the book"));
       li.append(head, el("div", "gloss", e.english));
       if (e.exm) li.append(el("div", "ex", `${e.exm} = ${e.exe}`));
-      li.append(el("div", "src", e.book ? `Panh dictionary, p. ${e.page}` : e.src));
+      li.append(el("div", "src", e.book ? `p. ${e.page}` : e.src));
+      li.lastChild.title = e.book ? `Panh dictionary, page ${e.page}` : e.src;
+      if (e.exm) li.append(li.querySelector(".ex"));
       ul.append(li);
     }
     card.append(ul);
@@ -206,7 +208,7 @@ function runSearch() {
     out.append(el("h2", "section", "Dictionary"), card);
   }
   if (r.sentences.length) {
-    const card = el("div", "card"), ul = el("ul", "results");
+    const card = el("div", "card list"), ul = el("ul", "results pairs");
     for (const s of r.sentences) {
       const li = el("li", "pair");
       li.append(el("div", "gloss", s.mien), el("div", "en", s.english),
@@ -322,11 +324,12 @@ $("goBtn").onclick = async () => {
       ] }],
     });
     let soFar = "";
-    stream.on("text", (t) => { soFar += t; $("mienOut").value = liveTranslation(soFar); });
+    stream.on("text", (t) => { soFar += t; $("mienOut").value = liveTranslation(soFar); fitMien(); });
     const msg = await stream.finalMessage();
     if (msg.stop_reason === "refusal") throw new Error("Claude declined to translate this text.");
     const out = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("");
     $("mienOut").value = tag(out, "translation") || out.trim();
+    fitMien();
     const notes = tag(out, "notes").split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
     $("notes").replaceChildren(...notes.map((n) => el("li", null, n)));
     $("notesBox").hidden = notes.length === 0;
@@ -532,6 +535,15 @@ $("resetBtn").onclick = () => {
   location.reload();
 };
 
+// The Mienh box grows to fit its text, so long translations spill down the page.
+function fitMien() {
+  const t = $("mienOut");
+  t.style.height = "auto";
+  t.style.height = `${t.scrollHeight + 2}px`;
+}
+$("mienOut").addEventListener("input", fitMien);
+window.addEventListener("resize", () => { if (!$("trResult").hidden) fitMien(); });
+
 $("copyBtn").onclick = async () => {
   try { await navigator.clipboard.writeText($("mienOut").value); $("copyBtn").textContent = "Copied"; }
   catch (e) { $("mienOut").select(); }
@@ -550,7 +562,8 @@ function showTab(name) {
       panel.querySelectorAll(".rise").forEach((n) => { n.style.animation = "none"; void n.offsetWidth; n.style.animation = ""; });
     }
   }
-  if (name === "tr") showTotal();
+  document.body.classList.toggle("wide", name === "tr");
+  if (name === "tr") { showTotal(); if (!$("trResult").hidden) fitMien(); }
 }
 $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
