@@ -27,16 +27,42 @@ async function decrypt(enc, password) {
   return JSON.parse(await new Response(stream).text());
 }
 
-let ENC = null;
+let ENC = null, PW = null;
 async function tryUnlock(password, remember) {
   if (!ENC) ENC = await (await fetch("data.json", { cache: "no-cache" })).json();
   let data;
   try { data = await decrypt(ENC, password); }
   catch (e) { return false; }
   store("pw", remember ? password : null);
+  PW = password;
   init(data);
   return true;
 }
+
+// Pick up a newer publish (new corrections, rules, dictionary pages) without a reload:
+// checked before every translation and whenever the app comes back to the screen.
+let refreshing = null;
+async function refreshData(quiet) {
+  if (!PW || !ENC) return false;
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const fresh = await (await fetch("data.json", { cache: "no-cache" })).json();
+      if (fresh.data === ENC.data) return false;
+      const data = await decrypt(fresh, PW);
+      ENC = fresh;
+      loadData(data);
+      if (!quiet) toast("Updated with the latest corrections and dictionary");
+      return true;
+    } catch (e) {
+      return false;  // offline or password changed: keep using what's loaded
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshData(); });
 
 $("unlock").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -80,7 +106,15 @@ function index(map, i, text) {
 }
 
 function init(data) {
+  loadData(data);
+  setupOptions();
+  initUI();
+}
+function loadData(data) {
   D = data;
+  EN_INDEX = new Map();
+  SENT_INDEX = new Map();
+  WOTD_POOL = null;
   ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx]) => ({
     mien, sense, english, exm, exe, page, book: !!book, src, rank: rank ?? (book ? 1 : 2), corr: rank === 0, ctx,
     nmien: norm(mien).replace(/!+$/, "").trim(), nen: norm(english),
@@ -93,7 +127,8 @@ function init(data) {
   SENTS.forEach((s, i) => index(SENT_INDEX, i, s.nen));
   STOP = new Set(data.stopwords);
   $("built").textContent = `Data updated ${data.built}`;
-  setupOptions();
+}
+function initUI() {
   $("loading").hidden = true;
   $("unlock").hidden = true;
   $("app").hidden = false;
@@ -260,7 +295,15 @@ function staticSystem() {
 function requestContext(text) {
   const words = contentWords(text);
   const gloss = glossaryFor(words);
-  const parts = ["# Dictionary entries for words in this text (English word: Mienh = gloss)"];
+  const parts = [];
+  const low = text.toLowerCase();
+  const must = ENTRIES.filter((r) => r.corr && r.english && low.includes(r.english.toLowerCase()));
+  if (must.length) {
+    parts.push("# REQUIRED: fluent-speaker corrections for phrases in this exact text. Use these Mienh renderings word for word.");
+    for (const r of must) parts.push(`- "${r.english}" → ${r.mien}`);
+    parts.push("");
+  }
+  parts.push("# Dictionary entries for words in this text (English word: Mienh = gloss)");
   const missing = [];
   for (const w of words) {
     const rows = gloss.get(w);
@@ -304,6 +347,8 @@ $("goBtn").onclick = async () => {
   if (!D.apiKey) { fail("Translation isn't set up yet (no API key). Dictionary lookups still work."); return; }
   if (text.length > D.maxChars) { fail(`That's too long. The limit is ${D.maxChars.toLocaleString()} characters; split it into parts.`); return; }
 
+  $("trStatus").textContent = "Checking for updates…";
+  await refreshData(true);
   const chosenModel = D.models[$("modelSel").value] ? $("modelSel").value : D.model;
   const chosenEffort = $("effortSel").value === "medium" ? "medium" : "high";
   lastModel = chosenModel;
