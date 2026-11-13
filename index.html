@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=8d97bf4ec0">
+<link rel="stylesheet" href="style.css?v=5f5e336763">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -152,12 +152,17 @@
             <div class="card result" id="resultCard">
               <div class="row result-tools">
                 <label class="check inline"><input type="checkbox" id="sideChk"> English side by side</label>
+                <span class="dict-toggle">
+                  <label class="switch-row" for="dictChk"><input type="checkbox" id="dictChk" role="switch"><span class="switch" aria-hidden="true"></span>Dictionary mode</label>
+                  <button type="button" class="info-q" id="dictHowBtn" aria-label="How dictionary mode works" title="How dictionary mode works">?</button>
+                </span>
                 <span class="spacer"></span>
                 <button class="btn secondary small" id="copyBtn" type="button">Copy</button>
                 <button class="btn secondary small" id="printBtn" type="button">Print</button>
                 <button class="btn secondary small" id="pdfBtn" type="button">Create PDF</button>
                 <button class="btn secondary small" id="corrBtn" type="button" aria-pressed="false">✎ Suggest a correction</button>
               </div>
+              <div class="dict-banner" id="dictBanner" hidden>Highlight any Mienh or English words to see what they mean (press and hold on a phone).</div>
               <div class="corr-banner" id="corrBanner" hidden>Highlight the words you want to correct (press and hold on a phone). Tap <b>Done</b> when finished.</div>
               <textarea id="mienOut" aria-label="Mienh translation" spellcheck="false"></textarea>
               <div class="side-view" id="sideView" hidden>
@@ -196,7 +201,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=8d97bf4ec0"></script>
+<script type="module" src="app.js?v=5f5e336763"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>
@@ -211,6 +216,41 @@
   <div class="corr-msg" id="corrMsg"></div>
   <div class="row"><button class="btn small" id="corrSend" type="submit">Send correction</button><button class="btn secondary small" id="corrCancel" type="button">Cancel</button></div>
 </form>
+<div class="corr-pop dict-pop" id="dictPop" hidden role="dialog" aria-label="Dictionary">
+  <div class="corr-pop-head"><span class="kicker">Dictionary</span><button type="button" class="corr-x" id="dictClose" aria-label="Close">×</button></div>
+  <div class="corr-sel" id="dictQ"></div>
+  <div id="dictBody"></div>
+  <button type="button" class="dict-open" id="dictOpen">Open in the Dictionary tab →</button>
+</div>
+<div class="how-modal" id="dictHowModal" hidden>
+  <div class="how-card" role="dialog" aria-modal="true" aria-labelledby="dictHowTitle">
+    <div class="corr-pop-head"><h3 id="dictHowTitle">How dictionary mode works</h3><button type="button" class="corr-x" id="dictHowClose" aria-label="Close">×</button></div>
+    <ol class="how-steps" id="dictHowSteps">
+      <li>Turn on <b>Dictionary mode</b> above the translation.</li>
+      <li>Highlight any word or phrase, Mienh or English.</li>
+      <li>A box pops up with what it means and where that comes from.</li>
+      <li>Highlight another word, or tap <b>×</b> to close it.</li>
+    </ol>
+    <div class="how-stage" id="dictHowStage" aria-hidden="true">
+      <div class="how-switch" id="dhSwitch"><span class="switch"></span>Dictionary mode</div>
+      <table class="side-table how-table">
+        <thead><tr><th>Mienh</th><th>English</th></tr></thead>
+        <tbody><tr>
+          <td class="mi" id="dhMi"><span>Ninh</span> <span class="w">hnamv</span> <span>haic</span> <span>ninh</span> <span>nyei</span> <span>fu'jueiv.</span></td>
+          <td class="en"><span>She</span> <span>loves</span> <span>her</span> <span>children</span> <span>very</span> <span>much.</span></td>
+        </tr></tbody>
+      </table>
+      <div class="how-dialog dict-demo" id="dhPop" hidden>
+        <div class="kicker">Dictionary</div>
+        <div class="corr-sel">hnamv</div>
+        <div class="dict-row"><b>hnamv</b> — love; to love; sweetheart; beloved <span class="dict-src">Panh dictionary p. 95</span></div>
+        <div class="dict-row"><b>hnamv</b> — to love <span class="tag gospel">LDS gospel term</span></div>
+      </div>
+      <svg class="how-cursor" id="dhCursor" viewBox="0 0 24 24" width="22" height="22"><path d="M4 2l15 10-7 1.4L8.4 21z" fill="#1d2235" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="row how-actions"><button class="btn secondary small" id="dictHowReplay" type="button">↻ Replay</button><button class="btn small" id="dictHowDone" type="button">Got it</button></div>
+  </div>
+</div>
 <button class="corr-bubble" id="corrBubble" type="button" hidden>✎ Send correction</button>
 <div class="how-modal" id="howModal" hidden>
   <div class="how-card" role="dialog" aria-modal="true" aria-labelledby="howTitle">

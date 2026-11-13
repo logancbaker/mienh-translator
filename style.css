@@ -503,3 +503,38 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 
 .tag.gospel { background: #e6ecfb; color: #2a3f8f; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag.gospel { background: #26305a; color: #c9d4ff; } }
+
+/* ---- Dictionary mode ---- */
+.dict-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0 14px; }
+.switch-row { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; user-select: none; }
+.switch-row input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch, .how-switch .switch { position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--line); transition: background .2s; flex: none; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.switch-row input:checked + .switch, .how-switch.on .switch { background: var(--green); }
+.switch-row input:checked + .switch::after, .how-switch.on .switch::after { transform: translateX(14px); }
+.switch-row input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-row input:checked ~ * { color: var(--ink); }
+.info-q { appearance: none; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface);
+  color: var(--muted); font: 700 12px/1 inherit; cursor: pointer; padding: 0; display: inline-grid; place-items: center; }
+.info-q:hover { color: var(--accent-ink); background: var(--accent); border-color: transparent; }
+.dict-banner { background: var(--ok-soft); border-radius: 10px; padding: 8px 12px; font-size: 14px; margin-bottom: 10px; }
+.dict-mode .side-table td { cursor: text; }
+.dict-mode .side-table { outline: 1px dashed var(--green); outline-offset: -1px; }
+.dict-pop { width: min(460px, calc(100vw - 24px)); padding: 16px 18px 14px; }
+.dict-pop .corr-sel { font-size: 17px; font-weight: 600; }
+#dictBody { max-height: 320px; overflow: auto; margin-top: 8px; }
+.dict-row { font-size: 15px; line-height: 1.45; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.dict-row:last-child { border-bottom: 0; }
+.dict-row .sense { color: var(--muted); font-size: 13px; }
+.dict-src { display: block; font-size: 12px; color: var(--muted); }
+.dict-ex { font-size: 13px; color: var(--muted); font-style: italic; }
+.dict-sub { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; margin: 10px 0 2px; }
+.dict-none { font-size: 14px; color: var(--muted); padding: 6px 0; }
+.dict-open { appearance: none; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; padding: 8px 0 0; }
+.how-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 10px; color: var(--muted); }
+.how-switch.on { color: var(--ink); }
+.how-table td.mi span.sel, .how-table td.en span.sel { background: #9cc3ff; color: #0b1a33; border-radius: 2px; box-shadow: 0 0 0 1px #9cc3ff; }
+#dictHowStage .how-table td.mi { opacity: 1; }
+#dictHowStage .how-table td.en { background: none; color: var(--muted); }
+.dict-demo .dict-row { font-size: 13px; }
+@media print { .dict-pop, .dict-toggle { display: none !important; } }

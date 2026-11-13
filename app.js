@@ -754,7 +754,7 @@ function renderSide() {
     const tr = el("tr");
     tr.dataset.i = i;
     const mi = el("td", "mi", r.mi), en = el("td", "en", r.en);
-    mi.contentEditable = correcting ? "false" : "true";
+    mi.contentEditable = correcting || dictOn ? "false" : "true";
     mi.spellcheck = false;
     mi.dataset.i = i;
     mi.oninput = () => {  // edits here flow back into the Mienh text
@@ -871,7 +871,7 @@ $("pdfBtn").onclick = async () => {
 // ---- Corrections from fluent speakers -------------------------------------------
 // Highlight words in the translation, type the correction, pick your name, send.
 // Corrections go to the user's private Google Sheet; a daily task reviews them.
-let correcting = false, lastModel = "", corrRange = null, corrInfo = null;
+let correcting = false, lastModel = "", corrRange = null, corrInfo = null, dictOn = false;
 
 function toast(msg) {
   const t = $("toast");
@@ -883,6 +883,7 @@ function toast(msg) {
 // Corrections go one way only: highlight English, type how it should be said in Mienh.
 // That needs the side-by-side view, so correcting turns it on.
 function setCorrecting(on) {
+  if (on && dictOn) setDict(false);
   if (on && !$("sideChk").checked) {
     $("sideChk").checked = true;
     store("side", null);
@@ -896,14 +897,182 @@ function setCorrecting(on) {
   $("corrBanner").innerHTML = "Highlight the <b>English</b> words (press and hold on a phone), then tap the <b>Send correction</b> bubble. Tap <b>Done</b> when finished."
     + '<button type="button" class="how-link" id="howBtn">▶ Show me how</button>';
   if (on) $("howBtn").onclick = openHow;
-  $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on ? "false" : "true"; });
+  $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on || dictOn ? "false" : "true"; });
   if (!on) { closePop(); hideBubble(); }
 }
 $("corrBtn").onclick = () => {
   if (!correcting && (!$("mienOut").value.trim() || $("corrBtn").disabled)) return;
   setCorrecting(!correcting);
 };
-$("sideChk").addEventListener("change", () => { if (correcting && !$("sideChk").checked) setCorrecting(false); });
+$("sideChk").addEventListener("change", () => {
+  if (correcting && !$("sideChk").checked) setCorrecting(false);
+  if (dictOn && !$("sideChk").checked) setDict(false);
+});
+
+// ---- Dictionary mode: highlight translated words to see what they mean ----------
+// Works on the side-by-side view (turned on automatically), Mienh or English.
+function setDict(on) {
+  if (on && correcting) setCorrecting(false);
+  if (on && !$("sideChk").checked) {
+    $("sideChk").checked = true;
+    store("side", null);
+    renderSide();
+  }
+  dictOn = on;
+  $("dictChk").checked = on;
+  $("resultCard").classList.toggle("dict-mode", on);
+  $("dictBanner").hidden = !on;
+  $("sideBody").querySelectorAll("td.mi").forEach((td) => { td.contentEditable = on || correcting ? "false" : "true"; });
+  if (!on) closeDict();
+}
+$("dictChk").onchange = () => setDict($("dictChk").checked);
+
+function dictSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const text = sel.toString().replace(/\s+/g, " ").trim();
+  if (!text || text.length > 120) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+  const cell = node && node.closest("#sideBody td");
+  if (!cell || !cell.contains(range.endContainer)) return null;
+  return { text, range: range.cloneRange(), english: cell.matches("td.en") };
+}
+
+const dictClean = (t) => t.replace(/[.,;:!?"“”()\[\]]/g, " ").replace(/\s+/g, " ").trim();
+function dictRow(e) {
+  const row = el("div", "dict-row");
+  row.append(el("b", "", e.mien));
+  if (e.sense) row.append(" ", el("span", "sense", `[${e.sense}]`));
+  row.append(` — ${e.english}`);
+  if (e.gospel) row.append(" ", el("span", "tag gospel", "LDS gospel term"));
+  else if (e.corr) row.append(" ", el("span", "tag corr", "fluent speaker"));
+  const src = e.book ? `Panh dictionary p. ${e.page}` : e.gospel ? `Mienh My Gospel p. ${e.page}`
+    : e.corr ? e.src.replace("Correction from ", "Correction from ") : e.src;
+  row.append(el("span", "dict-src", src));
+  if (e.exm) row.append(el("div", "dict-ex", `${e.exm} = ${e.exe}`));
+  return row;
+}
+// Exact matches for the highlighted word first (the whole headword, or a gloss that is
+// exactly the English), then the rest in the usual order of authority.
+function bestFirst(r, q, dirn, n) {
+  const nq = norm(q).trim();
+  const exact = (e) => (dirn === "mien" ? e.nmien === nq : glossHit(e.nen, wordForms(nq)));
+  const sorted = [...r.entries.filter(exact), ...r.entries.filter((e) => !exact(e))];
+  return { ...r, entries: sorted.slice(0, n) };
+}
+let dictQuery = null;
+function renderDict(info) {
+  const q = dictClean(info.text), dirn = info.english ? "en" : "mien";
+  dictQuery = { q, dirn };
+  $("dictQ").textContent = info.text;
+  const body = $("dictBody");
+  body.replaceChildren();
+  const r = bestFirst(search(q, dirn, 60, 1), q, dirn, 5);
+  if (r.entries.length) {
+    r.entries.forEach((e) => body.append(dictRow(e)));
+    if (r.totalEntries > r.entries.length) body.append(el("div", "dict-none", `+ ${r.totalEntries - r.entries.length} more in the Dictionary tab`));
+  }
+  // A phrase with no entry of its own: show each word.
+  const words = [...new Set(q.split(" ").filter((w) => w.length > 1))];
+  if (!r.entries.length && words.length > 1) {
+    body.append(el("div", "dict-sub", "Word by word"));
+    for (const w of words.slice(0, 8)) {
+      const h = bestFirst(search(w, dirn, 60, 0), w, dirn, 1).entries[0];
+      body.append(h ? dictRow(h) : el("div", "dict-none", `${w}: not found`));
+    }
+  } else if (!r.entries.length) {
+    body.append(el("div", "dict-none", "Not found in the dictionary."));
+  }
+  if (r.sentences.length) {
+    const s = r.sentences[0];
+    body.append(el("div", "dict-sub", "Example"), el("div", "dict-ex", `${s.mien} = ${s.english}`));
+  }
+}
+function showDict() {
+  if (!dictOn || pointerDown) return;
+  const info = dictSelection();
+  if (!info) return;
+  renderDict(info);
+  const pop = $("dictPop");
+  pop.hidden = false;
+  pop.style.animation = "none"; void pop.offsetWidth; pop.style.animation = "";
+  placePop(info.range.getBoundingClientRect(), pop);
+}
+function closeDict() { $("dictPop").hidden = true; }
+$("dictClose").onclick = closeDict;
+$("dictOpen").onclick = () => {
+  if (!dictQuery) return;
+  closeDict();
+  showTab("dict");
+  $("q").value = dictQuery.q;
+  document.querySelector(`.seg [data-dir="${dictQuery.dirn}"]`)?.click();
+  runSearch();
+};
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("dictPop").hidden) closeDict(); });
+let dictTimer = null;
+document.addEventListener("pointerdown", (e) => {  // starting a new selection closes the old box
+  if (dictOn && !e.target.closest("#dictPop") && !$("dictPop").hidden) closeDict();
+});
+document.addEventListener("pointerup", (e) => {
+  if (!dictOn || e.target.closest("#dictPop")) return;
+  setTimeout(showDict, 30);
+});
+document.addEventListener("selectionchange", () => {  // phones: wait for the selection to settle
+  if (!dictOn) return;
+  clearTimeout(dictTimer);
+  dictTimer = setTimeout(showDict, 500);
+});
+
+// ---- "?" tutorial for dictionary mode --------------------------------------------
+let dictHowRun = 0;
+function openDictHow() { $("dictHowModal").hidden = false; playDictHow(); }
+function closeDictHow() { $("dictHowModal").hidden = true; dictHowRun++; }
+$("dictHowBtn").onclick = openDictHow;
+$("dictHowClose").onclick = $("dictHowDone").onclick = closeDictHow;
+$("dictHowReplay").onclick = () => playDictHow();
+$("dictHowModal").addEventListener("click", (e) => { if (e.target === $("dictHowModal")) closeDictHow(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("dictHowModal").hidden) closeDictHow(); });
+async function playDictHow() {
+  const run = ++dictHowRun;
+  const wait = (ms) => new Promise((res, rej) => setTimeout(() => (run === dictHowRun ? res() : rej("stop")), ms));
+  const stage = $("dictHowStage"), cur = $("dhCursor"), sw = $("dhSwitch"), pop = $("dhPop");
+  const word = $("dhMi").querySelector(".w");
+  const steps = [...$("dictHowSteps").children];
+  const step = (n) => steps.forEach((li, i) => li.classList.toggle("on", i === n));
+  const pos = (node, fx = 0.5, fy = 0.6) => {
+    const s = stage.getBoundingClientRect(), r = node.getBoundingClientRect();
+    return [r.left - s.left + r.width * fx, r.top - s.top + r.height * fy];
+  };
+  const move = async (xy, ms = 750) => { cur.style.transitionDuration = `${ms}ms`; cur.style.transform = `translate(${xy[0]}px, ${xy[1]}px)`; await wait(ms + 60); };
+  const click = async () => { cur.classList.remove("click"); void cur.offsetWidth; cur.classList.add("click"); await wait(260); };
+  try {
+    for (;;) {
+      sw.classList.remove("on"); word.classList.remove("sel"); pop.hidden = true;
+      step(0);
+      cur.style.transitionDuration = "0ms";
+      cur.style.transform = `translate(${stage.clientWidth * 0.6}px, ${stage.clientHeight - 40}px)`;
+      await wait(600);
+      await move(pos(sw.querySelector(".switch")));
+      await click(); sw.classList.add("on");
+      await wait(600);
+      step(1);
+      await move(pos(word, 0, 0.6));
+      await move(pos(word, 1, 0.6), 500);
+      word.classList.add("sel");
+      await wait(350);
+      step(2);
+      pop.hidden = false;
+      await move([stage.clientWidth * 0.82, stage.clientHeight - 30], 600);
+      await wait(2600);
+      step(3);
+      await move(pos(pop.querySelector(".corr-sel"), 1.4, 0.5), 600);
+      await wait(1200);
+      pop.hidden = true; word.classList.remove("sel");
+      await wait(1200);
+    }
+  } catch (e) { /* stopped or replayed */ }
+}
 
 function selectionInfo() {
   const sel = window.getSelection();
@@ -941,8 +1110,7 @@ function openPop(info) {
 }
 
 // Put the box below, above, right or left of the selection, wherever it fits.
-function placePop(r) {
-  const pop = $("corrPop");
+function placePop(r, pop = $("corrPop")) {
   pop.classList.remove("sheet");
   if (window.innerWidth < 600) { pop.classList.add("sheet"); return; }
   const w = pop.offsetWidth, h = pop.offsetHeight, gap = 10, vw = window.innerWidth, vh = window.innerHeight;
