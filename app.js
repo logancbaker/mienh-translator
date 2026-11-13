@@ -115,9 +115,9 @@ function loadData(data) {
   EN_INDEX = new Map();
   SENT_INDEX = new Map();
   WOTD_POOL = null;
-  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx, gospel]) => ({
+  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx, gospel, match]) => ({
     mien, sense, english, exm, exe, page, book: !!book, src, rank: rank ?? (book ? 1 : 2), corr: rank === 0, ctx,
-    gospel: !!gospel,
+    gospel: !!gospel, match: match || "",
     nmien: norm(mien).replace(/!+$/, "").trim(), nen: norm(english),
   }));
   SENTS = data.sentences.map(([mien, english, label, ref]) => ({
@@ -195,7 +195,8 @@ function examplesFor(words, perWord = 2, cap = 60) {
   for (const w of words) {
     const idx = new Set(wordForms(w).flatMap((f) => SENT_INDEX.get(f) || []));
     const cands = [...idx].map((i) => SENTS[i]);
-    cands.sort((a, b) => (a.confirmed ? 0 : 1) - (b.confirmed ? 0 : 1) || a.mien.length - b.mien.length);
+    const gos = (x) => (x.label.includes("Mienh My Gospel") ? 0 : 1);  // the user's gospel wording next
+    cands.sort((a, b) => (a.confirmed ? 0 : 1) - (b.confirmed ? 0 : 1) || gos(a) - gos(b) || a.mien.length - b.mien.length);
     let n = 0;
     for (const s of cands) {
       if (seen.has(s.mien) || s.mien.length > 400) continue;
@@ -292,10 +293,17 @@ function gospelKeys(english) {
     .replace(/^(the|to|a|an) /, "")).filter((p) => p.length >= 3);
 }
 const escRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// The first letter may be capitalized at the start of a sentence.
+const firstCase = (k) => (/^[a-z]/i.test(k) ? `[${k[0].toLowerCase()}${k[0].toUpperCase()}]` + escRx(k.slice(1)) : escRx(k));
+const hasPhrase = (k, t) => new RegExp("(?<![\\w'])" + firstCase(k) + "(?:s|es)?(?![\\w'])").test(t);
+// A term's `match` list (case-sensitive phrases) overrides matching on its English gloss.
 function gospelMatches(text) {
-  const low = text.toLowerCase().replace(/’/g, "'").replace(/\s+/g, " ");
-  return ENTRIES.filter((r) => r.gospel && gospelKeys(r.english)
-    .some((k) => new RegExp("(?<![\\w'])" + escRx(k) + "(?:s|es)?(?![\\w'])").test(low)));
+  const plain = text.replace(/’/g, "'").replace(/\s+/g, " "), low = plain.toLowerCase();
+  return ENTRIES.filter((r) => {
+    if (!r.gospel) return false;
+    const exact = r.match.split(";").map((m) => m.trim()).filter(Boolean);
+    return exact.length ? exact.some((m) => hasPhrase(m, plain)) : gospelKeys(r.english).some((k) => hasPhrase(k, low));
+  });
 }
 
 function staticSystem() {
