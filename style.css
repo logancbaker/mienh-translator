@@ -500,3 +500,6 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 @keyframes tap { 50% { scale: .8; } }
 .how-actions { justify-content: flex-end; margin-top: 14px; }
 @media (max-width: 520px) { .how-stage { height: 380px; padding: 10px; } .how-table { font-size: 14px; } }
+
+.tag.gospel { background: #e6ecfb; color: #2a3f8f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag.gospel { background: #26305a; color: #c9d4ff; } }

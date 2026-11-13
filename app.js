@@ -115,8 +115,9 @@ function loadData(data) {
   EN_INDEX = new Map();
   SENT_INDEX = new Map();
   WOTD_POOL = null;
-  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx]) => ({
+  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx, gospel]) => ({
     mien, sense, english, exm, exe, page, book: !!book, src, rank: rank ?? (book ? 1 : 2), corr: rank === 0, ctx,
+    gospel: !!gospel,
     nmien: norm(mien).replace(/!+$/, "").trim(), nen: norm(english),
   }));
   SENTS = data.sentences.map(([mien, english, label, ref]) => ({
@@ -240,11 +241,14 @@ function runSearch() {
       const li = el("li"), head = el("div");
       head.append(el("span", "mien", e.mien));
       if (e.sense) head.append(el("span", "sense", `[${e.sense}]`));
-      if (e.corr) head.append(el("span", "tag corr", "fluent speaker"));
+      if (e.gospel) head.append(el("span", "tag gospel", "LDS gospel term"));
+      else if (e.corr) head.append(el("span", "tag corr", "fluent speaker"));
       else if (!e.book) head.append(el("span", "tag", "not in the Panh dictionary"));
       li.append(head, el("div", "gloss", e.english));
       if (e.exm) li.append(el("div", "ex", `${e.exm} = ${e.exe}`));
-      li.append(el("div", "src", e.book ? `p. ${e.page}` : e.corr ? e.src.replace("Correction from ", "") : e.src));
+      li.append(el("div", "src", e.book ? `p. ${e.page}` : e.gospel ? `Mienh My Gospel p. ${e.page}`
+        : e.corr ? e.src.replace("Correction from ", "") : e.src));
+      if (e.gospel && e.ctx) li.append(el("div", "ex", e.ctx));
       li.lastChild.title = e.book ? `Panh dictionary, page ${e.page}` : e.src;
       if (e.exm) li.append(li.querySelector(".ex"));
       ul.append(li);
@@ -281,11 +285,26 @@ function contentWords(text, cap = 400) {
   return out;
 }
 
+// Gospel terms from the user's Mienh My Gospel guide: what LDS Mienh actually say.
+// They come first for anything gospel-related (same logic as webapp/translate.py).
+function gospelKeys(english) {
+  return english.split(";").map((p) => p.replace(/\([^)]*\)/g, " ").toLowerCase().replace(/\s+/g, " ").trim()
+    .replace(/^(the|to|a|an) /, "")).filter((p) => p.length >= 3);
+}
+const escRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function gospelMatches(text) {
+  const low = text.toLowerCase().replace(/’/g, "'").replace(/\s+/g, " ");
+  return ENTRIES.filter((r) => r.gospel && gospelKeys(r.english)
+    .some((k) => new RegExp("(?<![\\w'])" + escRx(k) + "(?:s|es)?(?![\\w'])").test(low)));
+}
+
 function staticSystem() {
   const verified = SENTS.filter((s) => s.confirmed).map((s) => `- ${s.english} = ${s.mien}`);
+  const gospel = ENTRIES.filter((r) => r.gospel).map((r) => `- ${r.english} = ${r.mien}` + (r.ctx ? ` (${r.ctx})` : ""));
   const corr = ENTRIES.filter((r) => r.corr).map((r) => `- ${r.english} = ${r.mien} (${r.src.replace("Correction ", "")}${r.ctx ? `; in: ${r.ctx}` : ""})`);
   return [
     D.instructions,
+    "# Gospel terms LDS Mienh members use (from the user's Mienh My Gospel guide; they come first for anything gospel-related)\n\n" + (gospel.join("\n") || "(none yet)"),
     "# Corrections from fluent Mienh speakers (they override the Panh dictionary's word choice)\n\n" + (corr.join("\n") || "(none yet)"),
     "# The user's translation rules\n\n" + D.rules,
     "# Grammar notes\n\n" + D.grammar,
@@ -297,6 +316,12 @@ function requestContext(text) {
   const words = contentWords(text);
   const gloss = glossaryFor(words);
   const parts = [];
+  const gospel = gospelMatches(text);
+  if (gospel.length) {
+    parts.push("# REQUIRED: gospel terms in this text, as LDS Mienh members say them (Mienh My Gospel guide). Use these word for word.");
+    for (const r of gospel) parts.push(`- "${r.english}" → ${r.mien}`);
+    parts.push("");
+  }
   const low = text.toLowerCase();
   const must = ENTRIES.filter((r) => r.corr && r.english && low.includes(r.english.toLowerCase()));
   if (must.length) {
@@ -309,7 +334,7 @@ function requestContext(text) {
   for (const w of words) {
     const rows = gloss.get(w);
     if (!rows) { missing.push(w); continue; }
-    parts.push(`- ${w}: ` + rows.map((r) => `${r.mien} = ${r.english}` + (r.book ? "" : " [fallback source]")).join("; "));
+    parts.push(`- ${w}: ` + rows.map((r) => `${r.mien} = ${r.english}` + (r.gospel ? " [LDS gospel term]" : r.corr ? " [fluent speaker]" : r.book ? "" : " [fallback source]")).join("; "));
   }
   if (missing.length) parts.push("\nNot in the dictionary (describe or keep as a name): " + missing.join(", "));
   const ex = examplesFor(words);
