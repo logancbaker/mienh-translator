@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=68ac387315">
+<link rel="stylesheet" href="style.css?v=679f81dbd3">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -50,6 +50,7 @@
       <button role="tab" id="tab-home" aria-selected="true" aria-controls="panel-home">Home</button>
       <button role="tab" id="tab-dict" aria-selected="false" aria-controls="panel-dict">Dictionary</button>
       <button role="tab" id="tab-tr" aria-selected="false" aria-controls="panel-tr">Translate</button>
+      <button role="tab" id="tab-bible" aria-selected="false" aria-controls="panel-bible">Bible</button>
     </nav>
 
     <!-- Welcome -->
@@ -106,6 +107,40 @@
       <div id="dictMeta" class="meta"></div>
       <div id="dictOut"></div>
     </section>
+
+    <!-- Bible reader -->
+    <section class="panel" id="panel-bible" role="tabpanel" aria-labelledby="tab-bible" hidden>
+      <div class="card rise bible-bar">
+        <div class="row options">
+          <span class="opt"><label for="bibleBook">Book</label>
+          <select id="bibleBook"></select></span>
+          <span class="opt chap"><label for="bibleChap">Chapter</label>
+          <select id="bibleChap"></select></span>
+        </div>
+        <div class="row bible-nav">
+          <button class="btn secondary small" id="biblePrev" type="button">← Previous</button>
+          <button class="btn secondary small" id="bibleNext" type="button">Next →</button>
+          <label class="check inline"><input type="checkbox" id="bibleSide" checked> KJV English side by side</label>
+        </div>
+        <div class="hint">Tap any word to look it up in the dictionary.</div>
+      </div>
+      <h2 class="bible-title" id="bibleTitle"></h2>
+      <div id="bibleOut" class="bible-out"></div>
+      <div class="bible-nav bottom" id="bibleNavBottom" hidden>
+        <button class="btn secondary small" id="biblePrev2" type="button">← Previous chapter</button>
+        <button class="btn secondary small" id="bibleNext2" type="button">Next chapter →</button>
+      </div>
+    </section>
+
+    <!-- Tap-a-word lookup (Bible reader) -->
+    <div class="word-sheet" id="wordSheet" role="dialog" aria-modal="false" aria-labelledby="wordSheetTitle" hidden>
+      <div class="word-sheet-head">
+        <b id="wordSheetTitle"></b>
+        <button class="chip" id="wordSheetClose" type="button" aria-label="Close">✕</button>
+      </div>
+      <div id="wordSheetBody" class="word-sheet-body"></div>
+      <button class="chip" id="wordSheetMore" type="button">Open in Dictionary →</button>
+    </div>
 
     <!-- Translate -->
     <section class="panel" id="panel-tr" role="tabpanel" aria-labelledby="tab-tr" hidden>
@@ -201,7 +236,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=68ac387315"></script>
+<script type="module" src="app.js?v=679f81dbd3"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>

@@ -52,6 +52,7 @@ async function refreshData(quiet) {
       const data = await decrypt(fresh, PW);
       ENC = fresh;
       loadData(data);
+      if ($("panel-bible").hidden) setupBible();  // new chapters show up; don't redraw under a reader
       if (!quiet) toast("Updated with the latest corrections and dictionary");
       return true;
     } catch (e) {
@@ -109,6 +110,7 @@ function init(data) {
   loadData(data);
   setupOptions();
   initUI();
+  setupBible();
 }
 function loadData(data) {
   D = data;
@@ -1353,7 +1355,143 @@ $("copyBtn").onclick = async () => {
 };
 
 // ---- Tabs and start ----------------------------------------------------------
-const tabs = { home: [$("tab-home"), $("panel-home")], dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")] };
+// ---- Bible reader ---------------------------------------------------------------
+// Chapters of the user's Mienh Bible, each verse paired with the KJV (data.bible, built
+// from dictionary/bible_sentences.csv). Every word can be tapped to look it up.
+let bibleBook = 0, bibleChap = 0;
+const bibleBooks = () => (D && D.bible) || [];
+function setupBible() {
+  const books = bibleBooks();
+  $("bibleBook").replaceChildren(...books.map((b, i) =>
+    el("option", null, b.mien && b.mien !== b.en ? `${b.mien} (${b.en})` : b.en)).map((o, i) => { o.value = i; return o; }));
+  const saved = (load("bibleAt") || "").split("|");
+  const bi = books.findIndex((b) => b.en === saved[0]);
+  if (bi >= 0) { bibleBook = bi; bibleChap = Math.max(0, books[bi].chapters.findIndex((c) => String(c.n) === saved[1])); }
+  bibleBook = Math.min(bibleBook, Math.max(0, books.length - 1));
+  $("bibleSide").checked = load("bibleSide") !== "0";
+  renderBible();
+}
+function fillChapters() {
+  const b = bibleBooks()[bibleBook];
+  $("bibleChap").replaceChildren(...(b ? b.chapters : []).map((c, i) => { const o = el("option", null, String(c.n)); o.value = i; return o; }));
+  $("bibleChap").value = bibleChap;
+}
+// Split text into tappable words, keeping spaces and punctuation as plain text.
+function wordsInto(parent, text, lang) {
+  for (const part of text.split(/(\s+)/)) {
+    if (!part) continue;
+    if (/^\s+$/.test(part)) { parent.append(part); continue; }
+    const m = part.match(/^([^\p{L}\p{N}^']*)([\p{L}\p{N}^'’\-]*[\p{L}\p{N}])?(.*)$/u);
+    if (!m || !m[2]) { parent.append(part); continue; }
+    if (m[1]) parent.append(m[1]);
+    const w = el("span", "w", m[2]);
+    w.dataset.lang = lang;
+    parent.append(w);
+    if (m[3]) parent.append(m[3]);
+  }
+}
+function renderBible() {
+  const books = bibleBooks(), out = $("bibleOut");
+  out.replaceChildren();
+  out.classList.toggle("single", !$("bibleSide").checked);
+  fillChapters();
+  $("bibleBook").value = bibleBook;
+  const b = books[bibleBook], c = b && b.chapters[bibleChap];
+  if (!c) { $("bibleTitle").textContent = ""; out.append(el("div", "bible-empty", "No Bible chapters yet.")); $("bibleNavBottom").hidden = true; return; }
+  store("bibleAt", `${b.en}|${c.n}`);
+  $("bibleTitle").replaceChildren(`${b.mien} ${c.n}`, el("small", null, `${b.en} ${c.n} · King James Version beside it`));
+  let lastHead = null;
+  for (const [n, mien, en, head] of c.verses) {
+    if (head && head !== lastHead) { out.append(el("div", "bhead", head)); lastHead = head; }
+    const row = el("div", "bverse"), m = el("div", "bmien"), e = el("div", "ben");
+    m.append(el("span", "vn", n ? String(n) : "Title"));
+    e.append(el("span", "vn", n ? String(n) : "Title"));
+    wordsInto(m, mien, "mien");
+    wordsInto(e, en, "en");
+    row.append(m, e);
+    out.append(row);
+  }
+  const first = bibleBook === 0 && bibleChap === 0;
+  const last = bibleBook === books.length - 1 && bibleChap === b.chapters.length - 1;
+  for (const id of ["biblePrev", "biblePrev2"]) $(id).disabled = first;
+  for (const id of ["bibleNext", "bibleNext2"]) $(id).disabled = last;
+  $("bibleNavBottom").hidden = false;
+}
+function stepChapter(d) {
+  const books = bibleBooks();
+  let bi = bibleBook, ci = bibleChap + d;
+  if (ci < 0) { bi -= 1; if (bi < 0) return; ci = books[bi].chapters.length - 1; }
+  else if (ci >= books[bi].chapters.length) { bi += 1; if (bi >= books.length) return; ci = 0; }
+  bibleBook = bi; bibleChap = ci;
+  closeWord();
+  renderBible();
+  $("bibleTitle").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+$("bibleBook").onchange = () => { bibleBook = +$("bibleBook").value; bibleChap = 0; closeWord(); renderBible(); };
+$("bibleChap").onchange = () => { bibleChap = +$("bibleChap").value; closeWord(); renderBible(); };
+$("biblePrev").onclick = $("biblePrev2").onclick = () => stepChapter(-1);
+$("bibleNext").onclick = $("bibleNext2").onclick = () => stepChapter(1);
+$("bibleSide").onchange = () => { store("bibleSide", $("bibleSide").checked ? "1" : "0"); $("bibleOut").classList.toggle("single", !$("bibleSide").checked); };
+
+// Tap a word: show its dictionary entries. For Mienh, also try two- and three-word
+// phrases around it (many entries are compounds, e.g. "Singx Lingh", "baeqv-fingx").
+let wordOn = null, wordQuery = "", wordDir = "mien";
+function phraseEntries(spans, i) {
+  const words = spans.map((s) => norm(s.textContent).replace(/[^\p{L}\p{N}^' ]/gu, "").trim());
+  const found = [], seen = new Set();
+  for (const len of [3, 2]) {
+    for (let start = i - len + 1; start <= i; start++) {
+      if (start < 0 || start + len > words.length) continue;
+      const p = words.slice(start, start + len).join(" ");
+      for (const r of ENTRIES) if (r.nmien === p && !seen.has(r)) { seen.add(r); found.push(r); }
+    }
+  }
+  return found;
+}
+function showBibleWord(span) {
+  if (wordOn) wordOn.classList.remove("on");
+  wordOn = span; span.classList.add("on");
+  const lang = span.dataset.lang, raw = span.textContent;
+  wordQuery = raw.replace(/[’]/g, "'"); wordDir = lang === "mien" ? "mien" : "en";
+  let entries = [];
+  if (lang === "mien") {
+    const spans = [...span.parentElement.querySelectorAll(".w")];
+    entries = phraseEntries(spans, spans.indexOf(span));
+  }
+  const r = search(wordQuery, wordDir, 8, 0);
+  const exact = r.entries.filter((e) => (wordDir === "mien" ? e.nmien === norm(wordQuery) : true));
+  const list = [...entries, ...exact, ...r.entries].filter((e, k, a) => a.indexOf(e) === k).slice(0, 8);
+  $("wordSheetTitle").textContent = raw;
+  const body = $("wordSheetBody");
+  body.replaceChildren();
+  if (!list.length) body.append(el("div", "none", "Not in the dictionary."));
+  else {
+    const ul = el("ul");
+    for (const e of list) {
+      const li = el("li");
+      li.append(el("span", "mien", e.mien), el("span", "gloss", e.english));
+      li.append(el("div", "src", e.book ? `Panh dictionary p. ${e.page}` : e.gospel ? "Mienh My Gospel (LDS gospel term)" : e.corr ? "Fluent speaker correction" : e.src));
+      ul.append(li);
+    }
+    body.append(ul);
+  }
+  $("wordSheet").hidden = false;
+}
+function closeWord() { $("wordSheet").hidden = true; if (wordOn) wordOn.classList.remove("on"); wordOn = null; }
+$("bibleOut").addEventListener("click", (e) => { const w = e.target.closest(".w"); if (w) showBibleWord(w); });
+$("wordSheetClose").onclick = closeWord;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("wordSheet").hidden) closeWord(); });
+$("wordSheetMore").onclick = () => {
+  closeWord();
+  showTab("dict");
+  dir = wordDir;
+  document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.dir === dir)));
+  $("q").value = wordQuery;
+  runSearch();
+};
+
+const tabs = { home: [$("tab-home"), $("panel-home")], dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")],
+  bible: [$("tab-bible"), $("panel-bible")] };
 function showTab(name) {
   for (const [k, [btn, panel]] of Object.entries(tabs)) {
     const on = k === name, was = !panel.hidden;
@@ -1365,10 +1503,12 @@ function showTab(name) {
     }
   }
   if (name === "tr") { showTotal(); if (!$("trResult").hidden) fitMien(); }
+  if (name !== "bible") closeWord();
 }
 $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
 $("tab-tr").onclick = () => { showTab("tr"); $("enIn").focus(); };
+$("tab-bible").onclick = () => showTab("bible");
 
 // ---- Install as an app (Android / desktop Chrome) ------------------------------
 // The service worker makes the site installable; Chrome then offers a real app

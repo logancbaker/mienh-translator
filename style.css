@@ -538,3 +538,54 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 #dictHowStage .how-table td.en { background: none; color: var(--muted); }
 .dict-demo .dict-row { font-size: 13px; }
 @media print { .dict-pop, .dict-toggle { display: none !important; } }
+
+/* ---- Bible reader ---------------------------------------------------------- */
+.bible-bar .row.options label { width: auto; }
+.bible-bar .opt.chap { flex: 0 1 160px; }
+.bible-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.bible-nav .check.inline { margin: 0 0 0 auto; }
+.bible-nav.bottom { justify-content: space-between; margin: 18px 0 8px; }
+.bible-title { font-family: var(--serif, Georgia, serif); font-size: 22px; margin: 18px 2px 4px; }
+.bible-title small { display: block; font-size: 14px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.bible-out { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px 18px; }
+.bible-out .bhead { font-weight: 650; color: var(--indigo); margin: 16px 0 4px; font-size: 15px; }
+.bible-out .bhead.en { color: var(--muted); font-weight: 500; font-style: italic; }
+.bverse { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; padding: 8px 0; border-bottom: 1px solid var(--line); line-height: 1.6; }
+.bverse:last-child { border-bottom: 0; }
+.bible-out.single .bverse { grid-template-columns: 1fr; }
+.bible-out.single .ben { display: none; }
+.bverse .vn { font-size: 12px; font-weight: 700; color: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.bverse .ben { color: var(--muted); }
+.bverse .w { cursor: pointer; border-radius: 4px; padding: 0 1px; }
+.bverse .w:hover { background: var(--accent-soft); }
+.bverse .w.on { background: var(--gold); color: #1d2235; }
+.bible-empty { padding: 18px 2px; color: var(--muted); }
+@media (max-width: 700px) {
+  .bverse { grid-template-columns: 1fr; gap: 2px; }
+  .bverse .ben { font-size: 14px; }
+}
+.word-sheet { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50;
+  width: min(560px, calc(100vw - 24px)); max-height: 55vh; display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-hover); padding: 12px 14px 12px; }
+.word-sheet[hidden] { display: none; }
+.word-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.word-sheet-head b { font-size: 18px; }
+.word-sheet-body { overflow-y: auto; font-size: 14px; }
+.word-sheet-body ul { list-style: none; margin: 0; padding: 0; }
+.word-sheet-body li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.word-sheet-body li:last-child { border-bottom: 0; }
+.word-sheet-body .mien { font-weight: 650; margin-right: 6px; }
+.word-sheet-body .gloss { color: var(--ink); }
+.word-sheet-body .src { color: var(--muted); font-size: 12px; }
+.word-sheet-body .none { color: var(--muted); padding: 6px 0; }
+#wordSheetMore { align-self: flex-start; }
+/* Four tabs on a phone: let them share the width instead of running off the edge. */
+@media (max-width: 520px) {
+  nav.tabs { gap: 0; }
+  nav.tabs button { flex: 1 1 auto; padding: 10px 4px; font-size: 15px; min-width: 0; }
+  .bible-bar .row.options .opt { flex: 1 1 100%; }
+  .bible-bar .row.options .opt.chap { flex: 1 1 100%; }
+  .bible-nav .check.inline { margin: 4px 0 0; }
+}
+.bible-bar .row.options .opt select { max-width: 100%; }
