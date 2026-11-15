@@ -366,10 +366,49 @@ function liveTranslation(text) {
   return (j < 0 ? rest : rest.slice(0, j)).replace(/^\s+/, "");
 }
 
+// ---- Estimated translation time ---------------------------------------------------
+// Seconds per translation grow a little slower than the word count, so the estimate fits
+// seconds = c × words^p (a straight line on a log-log scale) to past runs.
+// Starting points: the Usage tab of the corrections Sheet (Opus 5.5, high effort, Nov 12–14 2026).
+// Each device then adds its own runs (saved with the cost history), so estimates keep improving.
+const SEED_RUNS = [[1358,151],[181,86],[1606,286],[26,15],[1514,219],[4,7],[1565,248],[193,47],[138,45],[59,26],[138,53],[59,28]]
+  .map(([words, seconds]) => ({ words, seconds, model: "claude-opus-5-5", effort: "high" }));
+function timeRuns() {
+  const own = getRuns().filter((r) => r.words > 0 && r.seconds > 0);
+  return SEED_RUNS.concat(own);
+}
+function estimateSeconds(words, model, effort) {
+  if (!words) return 0;
+  let pts = timeRuns();
+  const same = pts.filter((r) => r.model === model && r.effort === effort);
+  if (same.length >= 3) pts = same;     // enough runs with these settings: use only those
+  const X = pts.map((r) => Math.log(r.words)), Y = pts.map((r) => Math.log(r.seconds));
+  const n = X.length, mx = X.reduce((a, b) => a + b, 0) / n, my = Y.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0;
+  X.forEach((x, i) => { sxy += (x - mx) * (Y[i] - my); sxx += (x - mx) ** 2; });
+  const p = sxx ? sxy / sxx : 0.6, c = Math.exp(my - p * mx);
+  return c * Math.pow(words, p);
+}
+function fmtDuration(s) {
+  if (s < 15) return "a few seconds";
+  if (s < 55) return `about ${Math.round(s / 5) * 5} seconds`;
+  if (s < 90) return "about 1 minute";
+  return `about ${Math.round(s / 60)} minutes`;
+}
+function currentEstimate() {
+  const words = $("enIn").value.split(/\s+/).filter(Boolean).length;
+  const model = D && D.models && D.models[$("modelSel").value] ? $("modelSel").value : (D && D.model);
+  const effort = $("effortSel").value === "medium" ? "medium" : "high";
+  return { words, seconds: estimateSeconds(words, model, effort) };
+}
 function updateCount() {
   const n = $("enIn").value.length;
-  $("charCount").textContent = n ? `${n.toLocaleString()} characters` : "";
+  const { words, seconds } = n ? currentEstimate() : { words: 0, seconds: 0 };
+  $("charCount").textContent = n
+    ? `${words.toLocaleString()} words · ${n.toLocaleString()} characters · estimated time ${fmtDuration(seconds)}` : "";
 }
+$("modelSel").addEventListener("change", updateCount);
+$("effortSel").addEventListener("change", updateCount);
 $("enIn").addEventListener("input", () => { updateCount(); store("draft", $("enIn").value); });
 
 function fail(msg) { $("trError").replaceChildren(el("div", "banner err", msg)); }
@@ -427,9 +466,11 @@ $("goBtn").onclick = async () => {
   $("goBtn").disabled = true;
   $("resetBtn").disabled = true;
   const started = Date.now();
+  const est = Math.round(estimateSeconds(nEnglish, chosenModel, chosenEffort));
   const tick = setInterval(() => {
     const s = Math.round((Date.now() - started) / 1000);
-    $("trStatus").textContent = `Translating… ${s}s` + (s > 40 ? " (long texts take a few minutes)" : "");
+    $("trStatus").textContent = `Translating… ${s}s` +
+      (s <= est ? ` of about ${est}s` : s > 40 ? " (taking a bit longer than usual)" : "");
   }, 1000);
   $("trStatus").textContent = "Translating…";
   $("trDots").hidden = false;
@@ -482,6 +523,7 @@ $("goBtn").onclick = async () => {
     const notesTok = wantNotes ? Math.round(notesText.length / 4) : 0;
     const notesUsd = (notesTok * P.output) / 1e6;
     addRun({ t: new Date().toISOString(), usd: cost, model: chosenModel, effort: chosenEffort, words: nEnglish,
+      seconds: Math.round((Date.now() - started) / 1000),
       inTok: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
       outTok: u.output_tokens || 0, notes: wantNotes, notesTok, notesUsd });
     logUsage({ user: currentUser(), words: nEnglish, paragraphs: paras.length, model: modelName(chosenModel),
