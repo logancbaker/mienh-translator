@@ -3,6 +3,8 @@
 import Anthropic from "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.3.0/+esm";
 
 const $ = (id) => document.getElementById(id);
+// Macs use ⌘-click for "add a word"; the hint on the Bible page says so.
+if (/Macintosh/.test(navigator.userAgent) && !("ontouchend" in document)) document.documentElement.classList.add("is-mac");
 let D = null; // decrypted data
 
 function el(tag, cls, text) {
@@ -1435,9 +1437,12 @@ $("bibleSide").onchange = () => { store("bibleSide", $("bibleSide").checked ? "1
 
 // Tap a word: show its dictionary entries. For Mienh, also try two- and three-word
 // phrases around it (many entries are compounds, e.g. "Singx Lingh", "baeqv-fingx").
-let wordOn = null, wordQuery = "", wordDir = "mien";
+// ⌘-click (Mac) or Ctrl-click / Shift-click adds more words from the same verse, to look up
+// a phrase; on a phone, "+ Next word" / "+ Word before" in the panel do the same.
+let wordSel = [], wordQuery = "", wordDir = "mien";
+const cleanWord = (s) => norm(s.textContent).replace(/[^\p{L}\p{N}^' ]/gu, "").trim();
 function phraseEntries(spans, i) {
-  const words = spans.map((s) => norm(s.textContent).replace(/[^\p{L}\p{N}^' ]/gu, "").trim());
+  const words = spans.map(cleanWord);
   const found = [], seen = new Set();
   for (const len of [3, 2]) {
     for (let start = i - len + 1; start <= i; start++) {
@@ -1448,45 +1453,103 @@ function phraseEntries(spans, i) {
   }
   return found;
 }
-function showBibleWord(span) {
-  if (wordOn) wordOn.classList.remove("on");
-  wordOn = span; span.classList.add("on");
-  const lang = span.dataset.lang, raw = span.textContent;
-  wordQuery = raw.replace(/[’]/g, "'"); wordDir = lang === "mien" ? "mien" : "en";
-  let entries = [];
-  if (lang === "mien") {
-    const spans = [...span.parentElement.querySelectorAll(".w")];
-    entries = phraseEntries(spans, spans.indexOf(span));
-  }
-  const r = search(wordQuery, wordDir, 8, 0);
-  const exact = r.entries.filter((e) => (wordDir === "mien" ? e.nmien === norm(wordQuery) : true));
-  const list = [...entries, ...exact, ...r.entries].filter((e, k, a) => a.indexOf(e) === k).slice(0, 8);
-  $("wordSheetTitle").textContent = raw;
+function entryItem(e) {
+  const li = el("li");
+  li.append(el("span", "mien", e.mien), el("span", "gloss", e.english));
+  li.append(el("div", "src", e.book ? `Panh dictionary p. ${e.page}` : e.gospel ? "Mienh My Gospel (LDS gospel term)" : e.corr ? "Fluent speaker correction" : e.src));
+  return li;
+}
+function lookupWords(dirW, text, max) {
+  const r = search(text, dirW, max, 0);
+  const exact = r.entries.filter((e) => (dirW === "mien" ? e.nmien === norm(text) : true));
+  return [...exact, ...r.entries].filter((e, k, a) => a.indexOf(e) === k).slice(0, max);
+}
+function setWordSel(spans) {
+  wordSel.forEach((s) => s.classList.remove("on"));
+  const all = spans.length ? [...spans[0].parentElement.querySelectorAll(".w")] : [];
+  wordSel = [...new Set(spans)].sort((x, y) => all.indexOf(x) - all.indexOf(y));
+  wordSel.forEach((s) => s.classList.add("on"));
+  if (!wordSel.length) { closeWord(); return; }
+  showWordSel();
+}
+function showWordSel() {
+  const first = wordSel[0], lang = first.dataset.lang;
+  wordDir = lang === "mien" ? "mien" : "en";
+  const raw = wordSel.map((s) => s.textContent).join(" ");
+  wordQuery = raw.replace(/[’]/g, "'").replace(/[^\p{L}\p{N}^' \-]/gu, "").trim();
   const body = $("wordSheetBody");
   body.replaceChildren();
-  if (!list.length) body.append(el("div", "none", "Not in the dictionary."));
-  else {
-    const ul = el("ul");
-    for (const e of list) {
-      const li = el("li");
-      li.append(el("span", "mien", e.mien), el("span", "gloss", e.english));
-      li.append(el("div", "src", e.book ? `Panh dictionary p. ${e.page}` : e.gospel ? "Mienh My Gospel (LDS gospel term)" : e.corr ? "Fluent speaker correction" : e.src));
-      ul.append(li);
+  let list;
+  if (wordSel.length === 1) {
+    const spans = [...first.parentElement.querySelectorAll(".w")];
+    const around = lang === "mien" ? phraseEntries(spans, spans.indexOf(first)) : [];
+    list = [...around, ...lookupWords(wordDir, wordQuery, 8)].filter((e, k, a) => a.indexOf(e) === k).slice(0, 8);
+    if (!list.length) body.append(el("div", "none", "Not in the dictionary."));
+    else { const ul = el("ul"); list.forEach((e) => ul.append(entryItem(e))); body.append(ul); }
+  } else {
+    // The whole phrase first; then each word on its own, so nothing is lost when the
+    // phrase isn't an entry.
+    list = lookupWords(wordDir, wordQuery, 6);
+    body.append(el("div", "group", "Whole phrase"));
+    if (!list.length) body.append(el("div", "none", "No entry for the whole phrase."));
+    else { const ul = el("ul"); list.forEach((e) => ul.append(entryItem(e))); body.append(ul); }
+    for (const s of wordSel) {
+      const w = s.textContent.replace(/[’]/g, "'");
+      const one = lookupWords(wordDir, w, 3);
+      body.append(el("div", "group", w));
+      if (!one.length) body.append(el("div", "none", "Not in the dictionary."));
+      else { const ul = el("ul"); one.forEach((e) => ul.append(entryItem(e))); body.append(ul); }
     }
-    body.append(ul);
   }
+  $("wordSheetTitle").textContent = raw;
+  const all = [...first.parentElement.querySelectorAll(".w")];
+  const lo = all.indexOf(wordSel[0]), hi = all.indexOf(wordSel[wordSel.length - 1]);
+  $("wordPrev").disabled = lo <= 0;
+  $("wordNext").disabled = hi >= all.length - 1;
   $("wordSheet").hidden = false;
 }
-function closeWord() { $("wordSheet").hidden = true; if (wordOn) wordOn.classList.remove("on"); wordOn = null; }
-$("bibleOut").addEventListener("click", (e) => { const w = e.target.closest(".w"); if (w) showBibleWord(w); });
+function growSel(d) {
+  if (!wordSel.length) return;
+  const all = [...wordSel[0].parentElement.querySelectorAll(".w")];
+  const i = d > 0 ? all.indexOf(wordSel[wordSel.length - 1]) + 1 : all.indexOf(wordSel[0]) - 1;
+  if (all[i]) setWordSel([...wordSel, all[i]]);
+}
+function closeWord() { $("wordSheet").hidden = true; wordSel.forEach((s) => s.classList.remove("on")); wordSel = []; }
+function wordClick(e, w) {
+  const adding = e.metaKey || e.ctrlKey || e.shiftKey;
+  if (adding && wordSel.length && wordSel[0].parentElement === w.parentElement) {
+    // Toggle this word in the selection (same verse and language only).
+    setWordSel(wordSel.includes(w) ? wordSel.filter((s) => s !== w) : [...wordSel, w]);
+  } else {
+    setWordSel([w]);
+  }
+}
+$("bibleOut").addEventListener("click", (e) => {
+  const w = e.target.closest(".w");
+  if (!w) return;
+  if (e.shiftKey) e.preventDefault();
+  wordClick(e, w);
+});
+// On a Mac, Ctrl-click opens the context menu instead of clicking: treat it as "add".
+$("bibleOut").addEventListener("contextmenu", (e) => {
+  const w = e.target.closest(".w");
+  if (!w || !e.ctrlKey) return;
+  e.preventDefault();
+  wordClick(e, w);
+});
+// Shift-click would otherwise select text across the page.
+$("bibleOut").addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.closest(".w")) e.preventDefault(); });
+$("wordNext").onclick = () => growSel(1);
+$("wordPrev").onclick = () => growSel(-1);
 $("wordSheetClose").onclick = closeWord;
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("wordSheet").hidden) closeWord(); });
 $("wordSheetMore").onclick = () => {
+  const q = wordQuery, d = wordDir;
   closeWord();
   showTab("dict");
-  dir = wordDir;
+  dir = d;
   document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.dir === dir)));
-  $("q").value = wordQuery;
+  $("q").value = q;
   runSearch();
 };
 

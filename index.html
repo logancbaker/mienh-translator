@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=679f81dbd3">
+<link rel="stylesheet" href="style.css?v=9eaf593909">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -122,7 +122,7 @@
           <button class="btn secondary small" id="bibleNext" type="button">Next →</button>
           <label class="check inline"><input type="checkbox" id="bibleSide" checked> KJV English side by side</label>
         </div>
-        <div class="hint">Tap any word to look it up in the dictionary.</div>
+        <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
       </div>
       <h2 class="bible-title" id="bibleTitle"></h2>
       <div id="bibleOut" class="bible-out"></div>
@@ -139,7 +139,11 @@
         <button class="chip" id="wordSheetClose" type="button" aria-label="Close">✕</button>
       </div>
       <div id="wordSheetBody" class="word-sheet-body"></div>
-      <button class="chip" id="wordSheetMore" type="button">Open in Dictionary →</button>
+      <div class="word-sheet-foot">
+        <button class="chip" id="wordPrev" type="button">+ Word before</button>
+        <button class="chip" id="wordNext" type="button">+ Next word</button>
+        <button class="chip" id="wordSheetMore" type="button">Open in Dictionary →</button>
+      </div>
     </div>
 
     <!-- Translate -->
@@ -236,7 +240,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=679f81dbd3"></script>
+<script type="module" src="app.js?v=9eaf593909"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>

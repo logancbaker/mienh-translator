@@ -589,3 +589,14 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
   .bible-nav .check.inline { margin: 4px 0 0; }
 }
 .bible-bar .row.options .opt select { max-width: 100%; }
+
+.word-sheet-foot { display: flex; flex-wrap: wrap; gap: 6px; }
+.word-sheet-foot #wordSheetMore { margin-left: auto; }
+.word-sheet-foot button:disabled { opacity: .45; cursor: default; }
+.word-sheet-body .group { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 10px 0 2px; }
+.word-sheet-body .group:first-child { margin-top: 0; }
+.bverse .w { user-select: text; }
+html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
+.word-sheet-foot .chip { font-size: 13px; padding: 5px 10px; }
+.bible-bar .row.options .opt { min-width: 0; }
+.bible-bar .row.options .opt select { width: 100%; min-width: 0; text-overflow: ellipsis; }
