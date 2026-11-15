@@ -605,3 +605,7 @@ html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
 @media (max-width: 520px) { .bible-bar .row.options .opt.vol { flex: 1 1 100%; } }
 
 .tag.common { background: var(--ok-soft); color: var(--ok); }
+
+.meaning-box { margin-top: 14px; }
+.meaning-box summary { cursor: pointer; font-weight: 600; color: var(--muted, inherit); padding: 4px 0; }
+.meaning-box .card { margin-top: 6px; }

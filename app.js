@@ -483,6 +483,7 @@ $("goBtn").onclick = async () => {
   $("trDots").hidden = false;
   $("trResult").hidden = false;
   $("notesBox").hidden = true;
+  $("meaningBox").hidden = true;
   $("trMeta").textContent = "";
   $("mienOut").value = "";
   $("mienOut").style.height = "";
@@ -499,7 +500,7 @@ $("goBtn").onclick = async () => {
       system: [{ type: "text", text: staticSystem(), cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: [
         { type: "text", text: context },
-        { type: "text", text: (wantNotes ? "" : "Skip the notes this time: answer with only the <translation> section.\n\n") +
+        { type: "text", text: (wantNotes ? "" : "Skip the notes this time: answer with only the <meaning> and <translation> sections.\n\n") +
           "Translate this English into Iu-Mienh:\n\n" + toSend },
       ] }],
     });
@@ -508,7 +509,10 @@ $("goBtn").onclick = async () => {
       const box = $("mienOut");
       const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
       soFar += t;
-      box.value = unmark(liveTranslation(soFar));
+      const live = liveTranslation(soFar);
+      if (!live && soFar.includes("<meaning>")) $("trStatus").textContent = "Understanding the English first…";
+      else if (live && $("trStatus").textContent.startsWith("Understanding")) $("trStatus").textContent = "Translating…";
+      box.value = unmark(live);
       if ($("sideChk").checked) renderSide();
       fitMien();
       if (atEnd) box.scrollTop = box.scrollHeight;
@@ -519,6 +523,10 @@ $("goBtn").onclick = async () => {
     $("mienOut").value = readParas(tag(out, "translation") || out.trim(), paras.length).join("\n\n");
     fitMien();
     renderSide();
+    const meaning = tag(out, "meaning");
+    const mLines = meaning.split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
+    $("meaning").replaceChildren(...mLines.map((n) => el("li", null, n)));
+    $("meaningBox").hidden = mLines.length === 0;
     const notesText = wantNotes ? tag(out, "notes") : "";
     const notes = notesText.split("\n").map((n) => n.replace(/^[-•\s]+/, "").trim()).filter(Boolean);
     $("notes").replaceChildren(...notes.map((n) => el("li", null, n)));
