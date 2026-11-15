@@ -44,12 +44,30 @@ async function tryUnlock(password, remember) {
 // Pick up a newer publish (new corrections, rules, dictionary pages) without a reload:
 // checked before every translation and whenever the app comes back to the screen.
 let refreshing = null;
+// Newer code (not just data) needs a page reload. The version is the ?v= on this script's
+// link, and every publish writes the current one, unencrypted, into data.json as "code".
+const CODE_VER = new URL(import.meta.url).searchParams.get("v");
+let newCode = false, newCodeVer = null;
+function reloadForNewCode(thenTranslate) {
+  try {
+    sessionStorage.setItem("reloadedFor", newCodeVer || "");
+    if (thenTranslate) sessionStorage.setItem("autoTranslate", "1");
+    if (PW && !load("pw")) sessionStorage.setItem("pwOnce", PW);  // not remembered: carry it over this one reload
+  } catch (e) {}
+  location.replace(location.pathname + "?r=" + Date.now());  // skip the browser's 10-minute copy of the page
+}
 async function refreshData(quiet) {
   if (!PW || !ENC) return false;
   if (refreshing) return refreshing;
   refreshing = (async () => {
     try {
       const fresh = await (await fetch("data.json", { cache: "no-cache" })).json();
+      if (fresh.code && fresh.code !== CODE_VER) {  // no ?v= at all: a very old page
+        let tried = null;
+        try { tried = sessionStorage.getItem("reloadedFor"); } catch (e) {}
+        newCode = tried !== fresh.code;  // reload once per publish, never in a loop
+        newCodeVer = fresh.code;
+      }
       if (fresh.data === ENC.data) return false;
       const data = await decrypt(fresh, PW);
       ENC = fresh;
@@ -65,7 +83,12 @@ async function refreshData(quiet) {
   })();
   return refreshing;
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshData(); });
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden) return;
+  await refreshData();
+  // Back on the page with nothing on screen to lose: load the new code now.
+  if (newCode && !busy && $("trResult").hidden) reloadForNewCode(false);
+});
 
 $("unlock").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -113,6 +136,10 @@ function init(data) {
   setupOptions();
   initUI();
   setupBible();
+  if (location.search.includes("r=")) history.replaceState(null, "", location.pathname);
+  let auto = false;
+  try { auto = sessionStorage.getItem("autoTranslate") === "1"; sessionStorage.removeItem("autoTranslate"); } catch (e) {}
+  if (auto) { showTab("tr"); setTimeout(() => $("goBtn").click(), 200); }  // reloaded for new code mid-request
 }
 function loadData(data) {
   D = data;
@@ -453,11 +480,17 @@ $("goBtn").onclick = async () => {
   if (!currentUser()) { $("userSel").focus(); return; }
   if (!text) { $("enIn").focus(); return; }
   $("trError").replaceChildren();
+  $("trStatus").textContent = "Checking for updates…";
+  await refreshData(true);
+  if (newCode) {
+    $("trStatus").textContent = "The website was updated. Loading the new version…";
+    reloadForNewCode(true);  // the English draft is saved; the translation starts again by itself
+    return;
+  }
+  $("trStatus").textContent = "";
   if (!D.apiKey) { fail("Translation isn't set up yet (no API key). Dictionary lookups still work."); return; }
   if (text.length > D.maxChars) { fail(`That's too long. The limit is ${D.maxChars.toLocaleString()} characters; split it into parts.`); return; }
 
-  $("trStatus").textContent = "Checking for updates…";
-  await refreshData(true);
   const chosenModel = D.models[$("modelSel").value] ? $("modelSel").value : D.model;
   const chosenEffort = $("effortSel").value === "medium" ? "medium" : "high";
   lastModel = chosenModel;
@@ -1634,6 +1667,11 @@ $("installBtn").onclick = async () => {
 window.addEventListener("appinstalled", () => { $("installBtn").hidden = true; });
 
 (async () => {
+  let once = null;
+  try { once = sessionStorage.getItem("pwOnce"); sessionStorage.removeItem("pwOnce"); } catch (e) {}
+  if (once) {
+    try { if (await tryUnlock(once, false)) return; } catch (e) {}
+  }
   const saved = load("pw");
   if (saved) {
     try { if (await tryUnlock(saved, true)) return; } catch (e) {}
