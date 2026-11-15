@@ -119,9 +119,9 @@ function loadData(data) {
   EN_INDEX = new Map();
   SENT_INDEX = new Map();
   WOTD_POOL = null;
-  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx, gospel, match]) => ({
+  ENTRIES = data.entries.map(([mien, sense, english, exm, exe, page, book, src, rank, ctx, gospel, match, uses, usesBy]) => ({
     mien, sense, english, exm, exe, page, book: !!book, src, rank: rank ?? (book ? 1 : 2), corr: rank === 0, ctx,
-    gospel: !!gospel, match: match || "",
+    gospel: !!gospel, match: match || "", uses: uses || 0, usesBy: usesBy || {},
     nmien: norm(mien).replace(/!+$/, "").trim(), nen: norm(english),
   }));
   SENTS = data.sentences.map(([mien, english, label, ref]) => ({
@@ -165,12 +165,12 @@ function search(q, dir, limit = 80, sentLimit = 20) {
       else if (rx.test(r.nmien)) score = 2;
     }
     if (dir !== "mien" && score === null && rx.test(r.nen)) score = glossHit(r.nen, [nq]) ? 1 : 3;
-    if (score !== null) hits.push([r.rank, score, r.mien.length, r.mien.toLowerCase(), r]);
+    if (score !== null) hits.push([r.rank, score, -r.uses, r.mien.length, r.mien.toLowerCase(), r]);
   }
-  hits.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || (a[3] < b[3] ? -1 : a[3] > b[3] ? 1 : 0));
+  hits.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || (a[4] < b[4] ? -1 : a[4] > b[4] ? 1 : 0));
   const sh = SENTS.filter((s) => (dir !== "en" && rx.test(s.nmien)) || (dir !== "mien" && rx.test(s.nen)));
   sh.sort((a, b) => (a.confirmed ? 0 : 1) - (b.confirmed ? 0 : 1) || a.mien.length - b.mien.length);
-  return { entries: hits.slice(0, limit).map((h) => h[4]), sentences: sh.slice(0, sentLimit),
+  return { entries: hits.slice(0, limit).map((h) => h[5]), sentences: sh.slice(0, sentLimit),
     totalEntries: hits.length, totalSentences: sh.length };
 }
 
@@ -187,9 +187,10 @@ function glossaryFor(words, perWord = 6) {
   for (const w of words) {
     const forms = wordForms(w);
     const idx = new Set(forms.flatMap((f) => EN_INDEX.get(f) || []));
-    const found = [...idx].map((i) => ENTRIES[i]).map((r) => [r.rank, glossHit(r.nen, forms) ? 0 : 1, r.nen.length, r]);
-    found.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
-    if (found.length) out.set(w, found.slice(0, perWord).map((f) => f[3]));
+    // Within each rank, words used in the official texts come first (most used first).
+    const found = [...idx].map((i) => ENTRIES[i]).map((r) => [r.rank, glossHit(r.nen, forms) ? 0 : 1, r.uses ? 0 : 1, -r.uses, r.nen.length, r]);
+    found.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3] || a[4] - b[4]);
+    if (found.length) out.set(w, found.slice(0, perWord).map((f) => f[5]));
   }
   return out;
 }
@@ -249,6 +250,7 @@ function runSearch() {
       if (e.gospel) head.append(el("span", "tag gospel", "LDS gospel term"));
       else if (e.corr) head.append(el("span", "tag corr", "fluent speaker"));
       else if (!e.book) head.append(el("span", "tag", "not in the Panh dictionary"));
+      if (e.uses && !e.gospel && !e.corr) head.append(usesTag(e));
       li.append(head, el("div", "gloss", e.english));
       if (e.exm) li.append(el("div", "ex", `${e.exm} = ${e.exe}`));
       li.append(el("div", "src", e.book ? `p. ${e.page}` : e.gospel ? `Mienh My Gospel p. ${e.page}`
@@ -346,7 +348,8 @@ function requestContext(text) {
   for (const w of words) {
     const rows = gloss.get(w);
     if (!rows) { missing.push(w); continue; }
-    parts.push(`- ${w}: ` + rows.map((r) => `${r.mien} = ${r.english}` + (r.gospel ? " [LDS gospel term]" : r.corr ? " [fluent speaker]" : r.book ? "" : " [fallback source]")).join("; "));
+    parts.push(`- ${w}: ` + rows.map((r) => `${r.mien} = ${r.english}` + (r.gospel ? " [LDS gospel term]" : r.corr ? " [fluent speaker]" : r.book ? "" : " [fallback source]") +
+      (r.uses ? ` [used ${r.uses}× in official texts]` : "")).join("; "));
   }
   if (missing.length) parts.push("\nNot in the dictionary (describe or keep as a name): " + missing.join(", "));
   const ex = examplesFor(words);
@@ -1473,9 +1476,17 @@ function phraseEntries(spans, i) {
   }
   return found;
 }
+// "Common" tag: how often a word appears in the official texts (Mienh My Gospel, the
+// Mienh Bible, the Book of Mormon reader, confirmed translations).
+function usesTag(e) {
+  const t = el("span", "tag common", `common · ${e.uses}×`);
+  t.title = "Used in official texts: " + Object.entries(e.usesBy).map(([k, v]) => `${k} ${v}×`).join(", ");
+  return t;
+}
 function entryItem(e) {
   const li = el("li");
   li.append(el("span", "mien", e.mien), el("span", "gloss", e.english));
+  if (e.uses && !e.gospel && !e.corr) li.append(" ", usesTag(e));
   li.append(el("div", "src", e.book ? `Panh dictionary p. ${e.page}` : e.gospel ? "Mienh My Gospel (LDS gospel term)" : e.corr ? "Fluent speaker correction" : e.src));
   return li;
 }
