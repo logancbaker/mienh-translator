@@ -1414,7 +1414,7 @@ function renderBible() {
   fillBooks();
   fillChapters();
   const b = books[bibleBook], c = b && b.chapters[bibleChap];
-  if (!c) { $("bibleTitle").textContent = ""; out.append(el("div", "bible-empty", "No Bible chapters yet.")); $("bibleNavBottom").hidden = true; return; }
+  if (!c) { $("bibleTitle").textContent = ""; out.append(el("div", "bible-empty", "No scripture chapters yet.")); $("bibleNavBottom").hidden = true; return; }
   store("bibleAt", `${b.en}|${c.n}`);
   $("bibleTitle").replaceChildren(`${b.mien} ${c.n}`,
     el("small", null, `${b.en !== b.mien ? `${b.en} ${c.n} · ` : ""}${b.src || "Mienh Bible"}, with the ${b.eng || "King James Version"} beside it`));
