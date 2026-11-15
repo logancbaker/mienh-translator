@@ -600,3 +600,6 @@ html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
 .word-sheet-foot .chip { font-size: 13px; padding: 5px 10px; }
 .bible-bar .row.options .opt { min-width: 0; }
 .bible-bar .row.options .opt select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+
+.bible-bar .row.options .opt.vol { flex: 1 1 200px; }
+@media (max-width: 520px) { .bible-bar .row.options .opt.vol { flex: 1 1 100%; } }

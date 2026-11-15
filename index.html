@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=9eaf593909">
+<link rel="stylesheet" href="style.css?v=e08df58f37">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -112,6 +112,8 @@
     <section class="panel" id="panel-bible" role="tabpanel" aria-labelledby="tab-bible" hidden>
       <div class="card rise bible-bar">
         <div class="row options">
+          <span class="opt vol"><label for="bibleVol">Volume</label>
+          <select id="bibleVol"></select></span>
           <span class="opt"><label for="bibleBook">Book</label>
           <select id="bibleBook"></select></span>
           <span class="opt chap"><label for="bibleChap">Chapter</label>
@@ -120,7 +122,7 @@
         <div class="row bible-nav">
           <button class="btn secondary small" id="biblePrev" type="button">← Previous</button>
           <button class="btn secondary small" id="bibleNext" type="button">Next →</button>
-          <label class="check inline"><input type="checkbox" id="bibleSide" checked> KJV English side by side</label>
+          <label class="check inline"><input type="checkbox" id="bibleSide" checked> English side by side</label>
         </div>
         <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
       </div>
@@ -240,7 +242,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=9eaf593909"></script>
+<script type="module" src="app.js?v=e08df58f37"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>

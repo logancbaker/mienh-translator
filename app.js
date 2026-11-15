@@ -1362,10 +1362,25 @@ $("copyBtn").onclick = async () => {
 // from dictionary/bible_sentences.csv). Every word can be tapped to look it up.
 let bibleBook = 0, bibleChap = 0;
 const bibleBooks = () => (D && D.bible) || [];
+// Volumes in order (Old Testament, New Testament, Book of Mormon…), only those with chapters.
+const bibleVols = () => [...new Set(bibleBooks().map((b) => b.vol || "Bible"))];
+function fillVolumes() {
+  $("bibleVol").replaceChildren(...bibleVols().map((v) => { const o = el("option", null, v); o.value = v; return o; }));
+}
+// The book list shows only the chosen volume's books (option values stay global indexes).
+function fillBooks() {
+  const books = bibleBooks(), cur = books[bibleBook], vol = cur ? (cur.vol || "Bible") : bibleVols()[0];
+  $("bibleVol").value = vol;
+  $("bibleBook").replaceChildren(...books.map((b, i) => [b, i]).filter(([b]) => (b.vol || "Bible") === vol).map(([b, i]) => {
+    const o = el("option", null, b.mien && b.mien !== b.en ? `${b.mien} (${b.en})` : b.en);
+    o.value = i;
+    return o;
+  }));
+  $("bibleBook").value = bibleBook;
+}
 function setupBible() {
   const books = bibleBooks();
-  $("bibleBook").replaceChildren(...books.map((b, i) =>
-    el("option", null, b.mien && b.mien !== b.en ? `${b.mien} (${b.en})` : b.en)).map((o, i) => { o.value = i; return o; }));
+  fillVolumes();
   const saved = (load("bibleAt") || "").split("|");
   const bi = books.findIndex((b) => b.en === saved[0]);
   if (bi >= 0) { bibleBook = bi; bibleChap = Math.max(0, books[bi].chapters.findIndex((c) => String(c.n) === saved[1])); }
@@ -1396,12 +1411,13 @@ function renderBible() {
   const books = bibleBooks(), out = $("bibleOut");
   out.replaceChildren();
   out.classList.toggle("single", !$("bibleSide").checked);
+  fillBooks();
   fillChapters();
-  $("bibleBook").value = bibleBook;
   const b = books[bibleBook], c = b && b.chapters[bibleChap];
   if (!c) { $("bibleTitle").textContent = ""; out.append(el("div", "bible-empty", "No Bible chapters yet.")); $("bibleNavBottom").hidden = true; return; }
   store("bibleAt", `${b.en}|${c.n}`);
-  $("bibleTitle").replaceChildren(`${b.mien} ${c.n}`, el("small", null, `${b.en} ${c.n} · King James Version beside it`));
+  $("bibleTitle").replaceChildren(`${b.mien} ${c.n}`,
+    el("small", null, `${b.en !== b.mien ? `${b.en} ${c.n} · ` : ""}${b.src || "Mienh Bible"}, with the ${b.eng || "King James Version"} beside it`));
   let lastHead = null;
   for (const [n, mien, en, head] of c.verses) {
     if (head && head !== lastHead) { out.append(el("div", "bhead", head)); lastHead = head; }
@@ -1429,6 +1445,10 @@ function stepChapter(d) {
   renderBible();
   $("bibleTitle").scrollIntoView({ block: "start", behavior: "smooth" });
 }
+$("bibleVol").onchange = () => {
+  const i = bibleBooks().findIndex((b) => (b.vol || "Bible") === $("bibleVol").value);
+  if (i >= 0) { bibleBook = i; bibleChap = 0; closeWord(); renderBible(); }
+};
 $("bibleBook").onchange = () => { bibleBook = +$("bibleBook").value; bibleChap = 0; closeWord(); renderBible(); };
 $("bibleChap").onchange = () => { bibleChap = +$("bibleChap").value; closeWord(); renderBible(); };
 $("biblePrev").onclick = $("biblePrev2").onclick = () => stepChapter(-1);
