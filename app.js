@@ -1744,8 +1744,17 @@ function renderCompare() {
   $("cmpMsg").textContent = ""; $("cmpMsg").className = "corr-msg";
   $("cmpPrev").disabled = cmpIdx === 0;
   cmpPick(cmpChoice, true);
+  // Nothing on the card can be used until a speaker is chosen.
+  const locked = !CMP_USERS.includes(who);
+  $("cmpItem").classList.toggle("locked", locked);
+  $("cmpItem").querySelectorAll("button, textarea, input").forEach((n) => { if (locked) n.disabled = true; });
+  if (!locked) {
+    opts.querySelectorAll("button").forEach((n) => { n.disabled = false; });
+    $("cmpSkip").disabled = false; $("cmpOwn").disabled = false; $("cmpWhy").disabled = false;
+  }
 }
 function cmpPick(v, quiet) {
+  if (!quiet && !CMP_USERS.includes(cmpWho())) return;
   cmpChoice = v;
   $("cmpOpts").querySelectorAll(".cmp-opt").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === v)));
   const more = $("cmpMore");
