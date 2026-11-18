@@ -6,6 +6,11 @@ const $ = (id) => document.getElementById(id);
 // Macs use ⌘-click for "add a word"; the hint on the Bible page says so.
 if (/Macintosh/.test(navigator.userAgent) && !("ontouchend" in document)) document.documentElement.classList.add("is-mac");
 let D = null; // decrypted data
+// A personal Compare link (?go=code from the batch email) opens Compare as that speaker.
+try {
+  const go = new URLSearchParams(location.search).get("go");
+  if (go) { sessionStorage.setItem("goCompare", go); history.replaceState(null, "", location.pathname); }
+} catch (e) {}
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -137,6 +142,13 @@ function init(data) {
   initUI();
   setupBible();
   setupCompare();
+  let go = null;
+  try { go = sessionStorage.getItem("goCompare"); sessionStorage.removeItem("goCompare"); } catch (e) {}
+  const goWho = go && (D.links || {})[go];
+  if (goWho && D.compare && D.compare.length) {
+    $("userSel").value = goWho; store("user", goWho); updateUserState();
+    showTab("cmp");
+  }
   if (location.search.includes("r=")) history.replaceState(null, "", location.pathname);
   let auto = false;
   try { auto = sessionStorage.getItem("autoTranslate") === "1"; sessionStorage.removeItem("autoTranslate"); } catch (e) {}
@@ -1670,12 +1682,34 @@ async function cmpCheckReady() {
   } catch (e) { cmpReady = true; }  // can't tell from here; try sending
   return cmpReady;
 }
+// Answers already in the Sheet (from any device) for this speaker and batch.
+const cmpSynced = new Set();
+async function cmpSync(who) {
+  const cfg = D.corrections || {}, key = `${who}|${cmpBatch.batch}`;
+  if (!cfg.url || !CMP_USERS.includes(who) || cmpSynced.has(key)) return;
+  cmpSynced.add(key);
+  try {
+    const res = await fetch(cfg.url, { method: "POST",
+      body: JSON.stringify({ token: cfg.token, kind: "progress", who, batch: cmpBatch.batch }) });
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.items)) return;
+    let added = 0;
+    for (const a of data.items) {
+      if (!cmpAnswered(who, a.item)) { store(cmpKey(who, a.item), JSON.stringify({ choice: a.choice, own: a.own || "", comment: a.comment || "" })); added++; }
+    }
+    if (added && cmpWho() === who) { cmpIdx = cmpFirstOpen(); renderCompare(); }
+  } catch (e) { /* offline or older script: this device's memory still works */ }
+}
+function cmpComplete(who) { return !!cmpBatch && !!who && cmpBatch.items.every((it) => cmpAnswered(who, it.id)); }
 function renderCompare() {
   if (!cmpBatch) return;
   const who = cmpWho(), items = cmpBatch.items, n = items.length;
   const done = items.filter((it) => cmpAnswered(who, it.id)).length;
+  if (who) cmpSync(who);
   $("cmpFill").style.width = `${Math.round(100 * done / n)}%`;
-  $("cmpCount").textContent = `${done} of ${n} answered`;
+  $("cmpCount").textContent = done === n ? "✓ Completed" : `${done} of ${n} answered`;
+  $("cmpCount").classList.toggle("done", done === n);
+  $("tab-cmp").textContent = cmpComplete(who) ? "Compare ✓" : "Compare";
   const note = $("cmpNote"); note.replaceChildren();
   if (!who) note.append(el("div", "banner err", "Choose your name in the User box first."));
   else if (!CMP_USERS.includes(who)) note.append(el("div", "banner err", "Only the fluent speakers on the list can answer these."));

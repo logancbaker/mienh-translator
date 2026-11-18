@@ -652,3 +652,6 @@ html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
   .cmp-actions .btn { flex: 1 1 auto; }
   .cmp-actions .spacer { display: none; }
 }
+.cmp-count.done { color: var(--ok); font-weight: 700; }
+.cmp-badge { display: inline-block; background: var(--ok-soft); color: var(--ok); font-weight: 700; font-size: 14px;
+  padding: 4px 12px; border-radius: 999px; margin-bottom: 8px; }
