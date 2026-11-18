@@ -1709,7 +1709,7 @@ function renderCompare() {
   $("cmpFill").style.width = `${Math.round(100 * done / n)}%`;
   $("cmpCount").textContent = done === n ? "✓ Completed" : `${done} of ${n} answered`;
   $("cmpCount").classList.toggle("done", done === n);
-  $("tab-cmp").textContent = cmpComplete(who) ? "Compare ✓" : "Compare";
+  $("tab-cmp").textContent = cmpComplete(who) ? "Translation Training ✓" : "Translation Training";
   const note = $("cmpNote"); note.replaceChildren();
   if (!who) note.append(el("div", "banner err", "Choose your name in the User box first."));
   else if (!CMP_USERS.includes(who)) note.append(el("div", "banner err", "Only the fluent speakers on the list can answer these."));
