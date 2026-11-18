@@ -136,6 +136,7 @@ function init(data) {
   setupOptions();
   initUI();
   setupBible();
+  setupCompare();
   if (location.search.includes("r=")) history.replaceState(null, "", location.pathname);
   let auto = false;
   try { auto = sessionStorage.getItem("autoTranslate") === "1"; sessionStorage.removeItem("autoTranslate"); } catch (e) {}
@@ -1625,8 +1626,154 @@ $("wordSheetMore").onclick = () => {
   runSearch();
 };
 
+
+// ---- Compare: fluent speakers pick the better of 2-3 Mienh versions -------------
+// Batches come from training/batch_*.json (built into the encrypted data). Answers go to
+// the "Compare" tab of the corrections Sheet; this device remembers what each user answered.
+const CMP_USERS = ["Gauv Meng", "Meix Waah", "Yauz-Seng", "Zanx Jiemh"];
+let cmpBatch = null, cmpIdx = 0, cmpChoice = null, cmpOrder = [], cmpReady = null;
+const cmpKey = (who, id) => `cmp:${who}:${id}`;
+function cmpAnswered(who, id) { try { return JSON.parse(load(cmpKey(who, id)) || "null"); } catch (e) { return null; } }
+function cmpHash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function cmpShuffle(list, seed) {  // the same order every time for this user and sentence
+  const a = list.slice(); let x = seed || 1;
+  for (let i = a.length - 1; i > 0; i--) { x = (Math.imul(x, 1103515245) + 12345) >>> 0; const j = x % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function setupCompare() {
+  const batches = D.compare || [];
+  $("tab-cmp").hidden = !batches.length;
+  if (!batches.length) return;
+  $("cmpBatch").replaceChildren(...batches.map((b, i) => {
+    const o = el("option", "", `Batch ${b.batch}: ${b.title} (${b.items.length})`); o.value = i; return o;
+  }));
+  $("cmpBatch").value = String(batches.length - 1);
+  $("cmpBatch").hidden = batches.length < 2;
+  cmpBatch = batches[batches.length - 1];
+  $("cmpUser").value = $("userSel").value;
+  cmpIdx = cmpFirstOpen();
+}
+function cmpWho() { return $("cmpUser").value; }
+function cmpFirstOpen() {
+  const who = cmpWho(); if (!cmpBatch) return 0;
+  const i = cmpBatch.items.findIndex((it) => !cmpAnswered(who, it.id));
+  return i < 0 ? cmpBatch.items.length : i;
+}
+// Is the Sheet's script new enough to save answers? (an older one would refuse them)
+async function cmpCheckReady() {
+  const cfg = D.corrections || {};
+  if (!cfg.url) return false;
+  if (cmpReady !== null) return cmpReady;
+  try {
+    const r = await (await fetch(cfg.url)).json();
+    cmpReady = /compare/.test(r.service || "");
+  } catch (e) { cmpReady = true; }  // can't tell from here; try sending
+  return cmpReady;
+}
+function renderCompare() {
+  if (!cmpBatch) return;
+  const who = cmpWho(), items = cmpBatch.items, n = items.length;
+  const done = items.filter((it) => cmpAnswered(who, it.id)).length;
+  $("cmpFill").style.width = `${Math.round(100 * done / n)}%`;
+  $("cmpCount").textContent = `${done} of ${n} answered`;
+  const note = $("cmpNote"); note.replaceChildren();
+  if (!who) note.append(el("div", "banner err", "Choose your name in the User box first."));
+  else if (!CMP_USERS.includes(who)) note.append(el("div", "banner err", "Only the fluent speakers on the list can answer these."));
+  else cmpCheckReady().then((ok) => {
+    if (!ok) note.replaceChildren(el("div", "banner err", "Answers can't be saved yet: Yauz-Seng needs to finish the setup."));
+  });
+  const finished = cmpIdx >= n;
+  $("cmpItem").hidden = finished; $("cmpDone").hidden = !finished;
+  if (finished) return;
+  const it = items[cmpIdx], prev = cmpAnswered(who, it.id);
+  $("cmpNum").replaceChildren(document.createTextNode(`Sentence ${cmpIdx + 1} of ${n}`));
+  if (prev) $("cmpNum").append(el("span", "cmp-answered", "✓ answered"));
+  $("cmpEn").textContent = it.english;
+  cmpOrder = cmpShuffle(it.versions.map((v) => v.v), cmpHash(`${who}|${it.id}`));
+  cmpChoice = prev ? prev.choice : null;
+  const opts = $("cmpOpts"); opts.replaceChildren();
+  cmpOrder.forEach((v, i) => {
+    const ver = it.versions.find((x) => x.v === v);
+    const b = el("button", "cmp-opt", ver.mien);
+    b.type = "button"; b.setAttribute("role", "radio"); b.dataset.n = i + 1; b.dataset.v = v;
+    opts.append(b);
+  });
+  const alts = el("div", "cmp-alts");
+  for (const [v, label] of [["all", "They all sound fine"], ["none", "None is right"]]) {
+    const b = el("button", "cmp-opt alt", label); b.type = "button"; b.setAttribute("role", "radio"); b.dataset.n = "·"; b.dataset.v = v;
+    alts.append(b);
+  }
+  opts.append(alts);
+  opts.querySelectorAll(".cmp-opt").forEach((b) => { b.onclick = () => cmpPick(b.dataset.v); });
+  $("cmpOwn").value = prev ? prev.own || "" : "";
+  $("cmpWhy").value = prev ? prev.comment || "" : "";
+  $("cmpMsg").textContent = ""; $("cmpMsg").className = "corr-msg";
+  $("cmpPrev").disabled = cmpIdx === 0;
+  cmpPick(cmpChoice, true);
+}
+function cmpPick(v, quiet) {
+  cmpChoice = v;
+  $("cmpOpts").querySelectorAll(".cmp-opt").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.v === v)));
+  const more = $("cmpMore");
+  more.hidden = !v;
+  more.classList.toggle("need", v === "none");
+  $("cmpOwnLabel").textContent = v === "none" ? "How would you say it? (needed when none is right)"
+    : v ? "Would you say it differently? (optional)" : "";
+  $("cmpSend").disabled = !v || !CMP_USERS.includes(cmpWho());
+  if (v && !quiet && v === "none") $("cmpOwn").focus();
+}
+async function cmpSend() {
+  const who = cmpWho(), it = cmpBatch.items[cmpIdx], cfg = D.corrections || {};
+  const own = $("cmpOwn").value.trim(), comment = $("cmpWhy").value.trim(), msg = $("cmpMsg");
+  if (!CMP_USERS.includes(who)) { msg.textContent = "Choose your name in the User box first."; msg.className = "corr-msg err"; return; }
+  if (cmpChoice === "none" && !own) { msg.textContent = "Please type how you would say it."; msg.className = "corr-msg err"; $("cmpOwn").focus(); return; }
+  if (!(await cmpCheckReady())) { msg.textContent = "Answers can't be saved yet: Yauz-Seng needs to finish the setup."; msg.className = "corr-msg err"; return; }
+  const chosen = it.versions.find((x) => x.v === cmpChoice);
+  const payload = {
+    token: cfg.token, kind: "compare", who, batch: cmpBatch.batch, item: it.id, english: it.english,
+    choice: cmpChoice, chosen_mien: chosen ? chosen.mien : "", own, comment,
+    shown: cmpOrder.join(","), versions: it.versions.map((x) => `${x.v}: ${x.mien}`).join("\n"),
+  };
+  $("cmpSend").disabled = true; msg.textContent = "Sending…"; msg.className = "corr-msg";
+  try {
+    try {
+      const res = await fetch(cfg.url, { method: "POST", body: JSON.stringify(payload) });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok === false) throw new Error(data.error || "not accepted");
+    } catch (err) {
+      if (!(err instanceof TypeError)) throw err;  // the reply couldn't be read; send without reading it
+      await fetch(cfg.url, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+    }
+    store(cmpKey(who, it.id), JSON.stringify({ choice: cmpChoice, own, comment }));
+    if (who === "Zanx Jiemh") toast("Thanks! Sent for Yauz-Seng to review.");
+    cmpIdx = cmpNextOpen(cmpIdx);
+    renderCompare();
+    if (!$("cmpDone").hidden) celebrate();
+    $("panel-cmp").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    msg.textContent = `Couldn't send it (${err.message}). Check the connection and try again.`;
+    msg.className = "corr-msg err";
+    $("cmpSend").disabled = false;
+  }
+}
+function cmpNextOpen(from) {
+  const who = cmpWho(), items = cmpBatch.items;
+  for (let i = from + 1; i < items.length; i++) if (!cmpAnswered(who, items[i].id)) return i;
+  const first = cmpFirstOpen();
+  return first < items.length ? first : items.length;
+}
+$("cmpSend").onclick = cmpSend;
+$("cmpSkip").onclick = () => { cmpIdx = Math.min(cmpIdx + 1, cmpBatch.items.length); if (cmpIdx >= cmpBatch.items.length) cmpIdx = cmpFirstOpen(); renderCompare(); };
+$("cmpPrev").onclick = () => { if (cmpIdx > 0) { cmpIdx--; renderCompare(); } };
+$("cmpReview").onclick = () => { cmpIdx = 0; $("cmpItem").hidden = false; $("cmpDone").hidden = true; renderCompare(); };
+$("cmpBatch").onchange = () => { cmpBatch = D.compare[+$("cmpBatch").value]; cmpIdx = cmpFirstOpen(); renderCompare(); };
+$("cmpUser").onchange = () => {
+  $("userSel").value = cmpWho(); store("user", cmpWho() || null); updateUserState();
+  cmpIdx = cmpFirstOpen(); renderCompare();
+};
+
 const tabs = { home: [$("tab-home"), $("panel-home")], dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")],
-  bible: [$("tab-bible"), $("panel-bible")] };
+  bible: [$("tab-bible"), $("panel-bible")], cmp: [$("tab-cmp"), $("panel-cmp")] };
 function showTab(name) {
   for (const [k, [btn, panel]] of Object.entries(tabs)) {
     const on = k === name, was = !panel.hidden;
@@ -1639,11 +1786,13 @@ function showTab(name) {
   }
   if (name === "tr") { showTotal(); if (!$("trResult").hidden) fitMien(); }
   if (name !== "bible") closeWord();
+  if (name === "cmp") { $("cmpUser").value = $("userSel").value; renderCompare(); }
 }
 $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
 $("tab-tr").onclick = () => { showTab("tr"); $("enIn").focus(); };
 $("tab-bible").onclick = () => showTab("bible");
+$("tab-cmp").onclick = () => showTab("cmp");
 
 // ---- Install as an app (Android / desktop Chrome) ------------------------------
 // The service worker makes the site installable; Chrome then offers a real app

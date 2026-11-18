@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=9ede138999">
+<link rel="stylesheet" href="style.css?v=bc462e0d70">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -51,6 +51,7 @@
       <button role="tab" id="tab-dict" aria-selected="false" aria-controls="panel-dict">Dictionary</button>
       <button role="tab" id="tab-tr" aria-selected="false" aria-controls="panel-tr">Translate</button>
       <button role="tab" id="tab-bible" aria-selected="false" aria-controls="panel-bible">Scriptures</button>
+      <button role="tab" id="tab-cmp" aria-selected="false" aria-controls="panel-cmp">Compare</button>
     </nav>
 
     <!-- Welcome -->
@@ -147,6 +148,58 @@
         <button class="chip" id="wordSheetMore" type="button">Open in Dictionary →</button>
       </div>
     </div>
+
+    <!-- Compare: fluent speakers pick the better of 2-3 translations -->
+    <section class="panel" id="panel-cmp" role="tabpanel" aria-labelledby="tab-cmp" hidden>
+      <div class="card rise cmp-intro">
+        <div class="cmp-head">
+          <div>
+            <h2 class="cmp-title">Which sounds right?</h2>
+            <p class="cmp-sub">Each English sentence has two or three Mienh versions. Tap the one a Mienh speaker would really say. If none is right, tell us how you would say it.</p>
+          </div>
+          <span class="user-pick"><label for="cmpUser">User</label>
+          <select id="cmpUser" aria-label="Who is answering">
+            <option value="">Choose your name</option>
+            <option>Gauv Meng</option>
+            <option>Meix Waah</option>
+            <option>Yauz-Seng</option>
+            <option>Zanx Jiemh</option>
+            <option>Sister Hahn</option>
+          </select></span>
+        </div>
+        <div class="cmp-bar">
+          <select id="cmpBatch" aria-label="Batch"></select>
+          <div class="cmp-progress" aria-hidden="true"><i id="cmpFill"></i></div>
+          <span class="cmp-count" id="cmpCount"></span>
+        </div>
+        <div id="cmpNote"></div>
+      </div>
+
+      <div class="card cmp-item" id="cmpItem">
+        <div class="kicker" id="cmpNum"></div>
+        <p class="cmp-en" id="cmpEn"></p>
+        <div class="cmp-opts" id="cmpOpts" role="radiogroup" aria-label="Mienh versions"></div>
+        <div class="cmp-more" id="cmpMore" hidden>
+          <label for="cmpOwn" id="cmpOwnLabel">How would you say it? (optional)</label>
+          <textarea id="cmpOwn" rows="3" placeholder="Type the Mienh the way you would say it" autocapitalize="none" spellcheck="false"></textarea>
+          <label for="cmpWhy">Anything else we should know? (optional)</label>
+          <input type="text" id="cmpWhy" placeholder="For example: number 2 is fine too, but older people say number 1" autocomplete="off">
+        </div>
+        <div class="cmp-actions">
+          <button class="btn secondary" id="cmpPrev" type="button">← Back</button>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="cmpSkip" type="button">Skip</button>
+          <button class="btn" id="cmpSend" type="button" disabled>Send &amp; next →</button>
+        </div>
+        <div class="corr-msg" id="cmpMsg"></div>
+      </div>
+
+      <div class="card cmp-done" id="cmpDone" hidden>
+        <h2 class="cmp-title">Laengz zingh haic! 🎉</h2>
+        <p>You've answered every sentence in this batch. Thank you: each answer teaches the translator how Mienh is really spoken.</p>
+        <button class="btn secondary" id="cmpReview" type="button">Look through my answers again</button>
+      </div>
+    </section>
 
     <!-- Translate -->
     <section class="panel" id="panel-tr" role="tabpanel" aria-labelledby="tab-tr" hidden>
@@ -246,7 +299,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=9ede138999"></script>
+<script type="module" src="app.js?v=bc462e0d70"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>
