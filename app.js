@@ -1656,13 +1656,15 @@ function setupCompare() {
   const batches = D.compare || [];
   $("tab-cmp").hidden = !batches.length;
   if (!batches.length) return;
-  $("cmpBatch").replaceChildren(...batches.map((b, i) => {
-    const o = el("option", "", `Batch ${b.batch}: ${b.title} (${b.items.length})`); o.value = i; return o;
-  }));
-  $("cmpBatch").value = String(batches.length - 1);
-  $("cmpBatch").hidden = batches.length < 2;
-  cmpBatch = batches[batches.length - 1];
+  $("cmpBatch").hidden = true;  // each speaker sees only their own newest batch
   $("cmpUser").value = $("userSel").value;
+  cmpPickBatch();
+}
+// The newest batch meant for this speaker (a batch with no "for" list is for everyone).
+function cmpPickBatch() {
+  const batches = D.compare || [], who = cmpWho();
+  const mine = batches.filter((b) => !(b.for || []).length || (b.for || []).includes(who));
+  cmpBatch = mine.length ? mine[mine.length - 1] : batches[batches.length - 1];
   cmpIdx = cmpFirstOpen();
 }
 function cmpWho() { return $("cmpUser").value; }
@@ -1809,10 +1811,9 @@ $("cmpSend").onclick = cmpSend;
 $("cmpSkip").onclick = () => { cmpIdx = Math.min(cmpIdx + 1, cmpBatch.items.length); if (cmpIdx >= cmpBatch.items.length) cmpIdx = cmpFirstOpen(); renderCompare(); };
 $("cmpPrev").onclick = () => { if (cmpIdx > 0) { cmpIdx--; renderCompare(); } };
 $("cmpReview").onclick = () => { cmpIdx = 0; $("cmpItem").hidden = false; $("cmpDone").hidden = true; renderCompare(); };
-$("cmpBatch").onchange = () => { cmpBatch = D.compare[+$("cmpBatch").value]; cmpIdx = cmpFirstOpen(); renderCompare(); };
 $("cmpUser").onchange = () => {
   $("userSel").value = cmpWho(); store("user", cmpWho() || null); updateUserState();
-  cmpIdx = cmpFirstOpen(); renderCompare();
+  cmpPickBatch(); renderCompare();
 };
 
 const tabs = { home: [$("tab-home"), $("panel-home")], dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")],
@@ -1829,7 +1830,7 @@ function showTab(name) {
   }
   if (name === "tr") { showTotal(); if (!$("trResult").hidden) fitMien(); }
   if (name !== "bible") closeWord();
-  if (name === "cmp") { $("cmpUser").value = $("userSel").value; renderCompare(); }
+  if (name === "cmp") { $("cmpUser").value = $("userSel").value; cmpPickBatch(); renderCompare(); }
 }
 $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
