@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=b9a34347d4">
+<link rel="stylesheet" href="style.css?v=10c313d2cc">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -51,6 +51,7 @@
       <button role="tab" id="tab-dict" aria-selected="false" aria-controls="panel-dict">Dictionary</button>
       <button role="tab" id="tab-tr" aria-selected="false" aria-controls="panel-tr">Translate</button>
       <button role="tab" id="tab-bible" aria-selected="false" aria-controls="panel-bible">Scriptures</button>
+      <button role="tab" id="tab-gc" aria-selected="false" aria-controls="panel-gc">General Conference</button>
       <button role="tab" id="tab-cmp" aria-selected="false" aria-controls="panel-cmp">Translation Training</button>
     </nav>
 
@@ -112,6 +113,10 @@
     <!-- Bible reader -->
     <section class="panel" id="panel-bible" role="tabpanel" aria-labelledby="tab-bible" hidden>
       <div class="card rise bible-bar">
+        <div class="find-box">
+          <input type="search" id="bibleFind" placeholder="Search for a book or chapter, e.g. John 4 or Moroni" autocomplete="off" aria-label="Search the scriptures by book" aria-controls="bibleFindList">
+          <ul class="find-list" id="bibleFindList" role="listbox" hidden></ul>
+        </div>
         <div class="row options">
           <span class="opt vol"><label for="bibleVol">Volume</label>
           <select id="bibleVol"></select></span>
@@ -132,6 +137,34 @@
       <div class="bible-nav bottom" id="bibleNavBottom" hidden>
         <button class="btn secondary small" id="biblePrev2" type="button">← Previous chapter</button>
         <button class="btn secondary small" id="bibleNext2" type="button">Next chapter →</button>
+      </div>
+    </section>
+
+    <!-- General Conference talks -->
+    <section class="panel" id="panel-gc" role="tabpanel" aria-labelledby="tab-gc" hidden>
+      <div class="card rise bible-bar">
+        <div class="find-box">
+          <input type="search" id="gcFind" placeholder="Search for a talk by speaker, title or year" autocomplete="off" aria-label="Search General Conference talks" aria-controls="gcFindList">
+          <ul class="find-list" id="gcFindList" role="listbox" hidden></ul>
+        </div>
+        <div class="row options">
+          <span class="opt vol"><label for="gcConf">Conference</label>
+          <select id="gcConf"></select></span>
+          <span class="opt"><label for="gcTalk">Talk</label>
+          <select id="gcTalk"></select></span>
+        </div>
+        <div class="row bible-nav">
+          <button class="btn secondary small" id="gcPrev" type="button">← Previous</button>
+          <button class="btn secondary small" id="gcNext" type="button">Next →</button>
+          <label class="check inline"><input type="checkbox" id="gcSide" checked> English side by side</label>
+        </div>
+        <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
+      </div>
+      <h2 class="bible-title" id="gcTitle"></h2>
+      <div id="gcOut" class="bible-out"></div>
+      <div class="bible-nav bottom" id="gcNavBottom" hidden>
+        <button class="btn secondary small" id="gcPrev2" type="button">← Previous talk</button>
+        <button class="btn secondary small" id="gcNext2" type="button">Next talk →</button>
       </div>
     </section>
 
@@ -300,7 +333,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=b9a34347d4"></script>
+<script type="module" src="app.js?v=10c313d2cc"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>

@@ -78,6 +78,7 @@ async function refreshData(quiet) {
       ENC = fresh;
       loadData(data);
       if ($("panel-bible").hidden) setupBible();  // new chapters show up; don't redraw under a reader
+      if ($("panel-gc").hidden) setupGC();
       if (!quiet) toast("Updated with the latest corrections and dictionary");
       return true;
     } catch (e) {
@@ -141,6 +142,7 @@ function init(data) {
   setupOptions();
   initUI();
   setupBible();
+  setupGC();
   setupCompare();
   let go = null;
   try { go = sessionStorage.getItem("goCompare"); sessionStorage.removeItem("goCompare"); } catch (e) {}
@@ -1512,6 +1514,142 @@ $("biblePrev").onclick = $("biblePrev2").onclick = () => stepChapter(-1);
 $("bibleNext").onclick = $("bibleNext2").onclick = () => stepChapter(1);
 $("bibleSide").onchange = () => { store("bibleSide", $("bibleSide").checked ? "1" : "0"); $("bibleOut").classList.toggle("single", !$("bibleSide").checked); };
 
+// ---- General Conference talks ------------------------------------------------------
+// Talks translated in translations/*.md (data.conference, newest conference first). Pick a
+// conference (month and year), then a talk ("Speaker - Title"). Same reading view as the
+// Scriptures tab: English beside the Mienh, every word can be tapped.
+let gcIdx = 0;
+const gcTalks = () => (D && D.conference) || [];
+const gcLabel = (t) => `${t.speaker} - ${t.title}`;
+function fillGcConfs() {
+  const talks = gcTalks(), confs = [...new Set(talks.map((t) => t.conf))];
+  $("gcConf").replaceChildren(...confs.map((c) => {
+    const o = el("option", null, talks.find((t) => t.conf === c).confLabel); o.value = c; return o;
+  }));
+}
+function fillGcTalks() {
+  const talks = gcTalks(), cur = talks[gcIdx];
+  if (!cur) { $("gcTalk").replaceChildren(); return; }
+  $("gcConf").value = cur.conf;
+  $("gcTalk").replaceChildren(...talks.map((t, i) => [t, i]).filter(([t]) => t.conf === cur.conf).map(([t, i]) => {
+    const o = el("option", null, gcLabel(t)); o.value = i; return o;
+  }));
+  $("gcTalk").value = gcIdx;
+}
+function setupGC() {
+  const talks = gcTalks();
+  $("tab-gc").hidden = !talks.length;
+  fillGcConfs();
+  const i = talks.findIndex((t) => t.id === load("gcAt"));
+  gcIdx = i >= 0 ? i : Math.min(gcIdx, Math.max(0, talks.length - 1));
+  $("gcSide").checked = load("gcSide") !== "0";
+  renderGC();
+}
+function renderGC() {
+  const talks = gcTalks(), out = $("gcOut"), t = talks[gcIdx];
+  out.replaceChildren();
+  out.classList.toggle("single", !$("gcSide").checked);
+  fillGcTalks();
+  if (!t) { $("gcTitle").textContent = ""; out.append(el("div", "bible-empty", "No talks yet.")); $("gcNavBottom").hidden = true; return; }
+  store("gcAt", t.id);
+  $("gcTitle").replaceChildren(t.mien || t.title, el("small", null, `${gcLabel(t)} · ${t.confLabel} General Conference`));
+  for (const [en, mien, isHead] of t.paras) {
+    if (isHead) {
+      const row = el("div", "bverse bsec"), m = el("div", "bmien bhead"), e = el("div", "ben bhead en");
+      wordsInto(m, mien, "mien"); wordsInto(e, en, "en");
+      row.append(m, e); out.append(row); continue;
+    }
+    const row = el("div", "bverse"), m = el("div", "bmien"), e = el("div", "ben");
+    wordsInto(m, mien, "mien");
+    wordsInto(e, en, "en");
+    row.append(m, e);
+    out.append(row);
+  }
+  for (const id of ["gcPrev", "gcPrev2"]) $(id).disabled = gcIdx === 0;
+  for (const id of ["gcNext", "gcNext2"]) $(id).disabled = gcIdx === talks.length - 1;
+  $("gcNavBottom").hidden = false;
+}
+function stepTalk(d) {
+  const i = gcIdx + d;
+  if (i < 0 || i >= gcTalks().length) return;
+  gcIdx = i; closeWord(); renderGC();
+  $("gcTitle").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+$("gcConf").onchange = () => {
+  const i = gcTalks().findIndex((t) => t.conf === $("gcConf").value);
+  if (i >= 0) { gcIdx = i; closeWord(); renderGC(); }
+};
+$("gcTalk").onchange = () => { gcIdx = +$("gcTalk").value; closeWord(); renderGC(); };
+$("gcPrev").onclick = $("gcPrev2").onclick = () => stepTalk(-1);
+$("gcNext").onclick = $("gcNext2").onclick = () => stepTalk(1);
+$("gcSide").onchange = () => { store("gcSide", $("gcSide").checked ? "1" : "0"); $("gcOut").classList.toggle("single", !$("gcSide").checked); };
+
+// ---- Search boxes (Scriptures and General Conference) ------------------------------
+// Type part of a name; matching books / talks appear under the box. Arrow keys and Enter
+// (or a tap) open one, so the dropdowns aren't needed.
+const findNorm = (x) => norm(String(x)).replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim();
+function setupFind(input, list, search, open) {
+  let items = [], at = -1;
+  const close = () => { list.hidden = true; list.replaceChildren(); items = []; at = -1; input.setAttribute("aria-expanded", "false"); };
+  const mark = () => list.querySelectorAll("li").forEach((li, i) => li.setAttribute("aria-selected", String(i === at)));
+  const pick = (it) => { close(); input.value = ""; input.blur(); open(it); };
+  input.addEventListener("input", () => {
+    const q = findNorm(input.value);
+    if (!q) return close();
+    items = search(q).slice(0, 12); at = items.length ? 0 : -1;
+    list.replaceChildren(...(items.length ? items : [null]).map((it, i) => {
+      const li = el("li", it ? null : "none", it ? it.label : "Nothing found");
+      if (it) {
+        li.setAttribute("role", "option");
+        if (it.sub) li.append(el("small", null, it.sub));
+        li.addEventListener("mousedown", (e) => { e.preventDefault(); pick(it); });
+      }
+      return li;
+    }));
+    list.hidden = false; input.setAttribute("aria-expanded", "true"); mark();
+  });
+  input.addEventListener("keydown", (e) => {
+    if (list.hidden || !items.length) { if (e.key === "Escape") close(); return; }
+    if (e.key === "ArrowDown") { at = (at + 1) % items.length; mark(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { at = (at - 1 + items.length) % items.length; mark(); e.preventDefault(); }
+    else if (e.key === "Enter") { if (at >= 0) pick(items[at]); e.preventDefault(); }
+    else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", () => setTimeout(close, 150));
+}
+// Scriptures: a book name (English or Mienh, any part of it), optionally followed by a
+// chapter number: "john 4", "moroni", "Yo^han 4", "1 ne".
+setupFind($("bibleFind"), $("bibleFindList"), (q) => {
+  const m = q.match(/^(.*?)\s*(\d+)$/), books = bibleBooks();
+  const tries = m && m[1] ? [[m[1], +m[2]], [q, null]] : [[q, null]];
+  for (const [name, ch] of tries) {
+    const hits = [];
+    books.forEach((b, bi) => {
+      const en = findNorm(b.en), mi = findNorm(b.mien);
+      const starts = en.startsWith(name) || mi.startsWith(name);
+      if (!starts && !en.includes(name) && !mi.includes(name)) return;
+      const named = b.mien && b.mien !== b.en ? `${b.mien} (${b.en})` : b.en;
+      if (ch !== null) {
+        const ci = b.chapters.findIndex((c) => c.n === ch);
+        if (ci >= 0) hits.push({ rank: starts ? 0 : 1, label: `${named} ${ch}`, sub: b.vol, bi, ci });
+      } else {
+        hits.push({ rank: starts ? 0 : 1, label: named, sub: `${b.vol} · ${b.chapters.length} chapter${b.chapters.length === 1 ? "" : "s"}`, bi, ci: 0 });
+      }
+    });
+    if (hits.length) return hits.sort((a, b) => a.rank - b.rank);
+  }
+  return [];
+}, (it) => { bibleBook = it.bi; bibleChap = it.ci; closeWord(); renderBible(); });
+// General Conference: every word typed must appear in the speaker, title (English or
+// Mienh) or conference ("April 2014", "2014-04").
+setupFind($("gcFind"), $("gcFindList"), (q) => {
+  const words = q.split(" ");
+  return gcTalks().map((t, i) => [t, i]).filter(([t]) => {
+    const hay = findNorm(`${t.speaker} ${t.title} ${t.mien} ${t.confLabel} ${t.conf}`);
+    return words.every((w) => hay.includes(w));
+  }).map(([t, i]) => ({ label: gcLabel(t), sub: t.confLabel, i }));
+}, (it) => { gcIdx = it.i; closeWord(); renderGC(); });
+
 // Tap a word: show its dictionary entries. For Mienh, also try two- and three-word
 // phrases around it (many entries are compounds, e.g. "Singx Lingh", "baeqv-fingx").
 // ⌘-click (Mac) or Ctrl-click / Shift-click adds more words from the same verse, to look up
@@ -1609,21 +1747,23 @@ function wordClick(e, w) {
     setWordSel([w]);
   }
 }
-$("bibleOut").addEventListener("click", (e) => {
-  const w = e.target.closest(".w");
-  if (!w) return;
-  if (e.shiftKey) e.preventDefault();
-  wordClick(e, w);
-});
-// On a Mac, Ctrl-click opens the context menu instead of clicking: treat it as "add".
-$("bibleOut").addEventListener("contextmenu", (e) => {
-  const w = e.target.closest(".w");
-  if (!w || !e.ctrlKey) return;
-  e.preventDefault();
-  wordClick(e, w);
-});
-// Shift-click would otherwise select text across the page.
-$("bibleOut").addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.closest(".w")) e.preventDefault(); });
+for (const out of [$("bibleOut"), $("gcOut")]) {
+  out.addEventListener("click", (e) => {
+    const w = e.target.closest(".w");
+    if (!w) return;
+    if (e.shiftKey) e.preventDefault();
+    wordClick(e, w);
+  });
+  // On a Mac, Ctrl-click opens the context menu instead of clicking: treat it as "add".
+  out.addEventListener("contextmenu", (e) => {
+    const w = e.target.closest(".w");
+    if (!w || !e.ctrlKey) return;
+    e.preventDefault();
+    wordClick(e, w);
+  });
+  // Shift-click would otherwise select text across the page.
+  out.addEventListener("mousedown", (e) => { if (e.shiftKey && e.target.closest(".w")) e.preventDefault(); });
+}
 $("wordNext").onclick = () => growSel(1);
 $("wordPrev").onclick = () => growSel(-1);
 $("wordSheetClose").onclick = closeWord;
@@ -1838,25 +1978,31 @@ $("cmpUser").onchange = () => {
 };
 
 const tabs = { home: [$("tab-home"), $("panel-home")], dict: [$("tab-dict"), $("panel-dict")], tr: [$("tab-tr"), $("panel-tr")],
-  bible: [$("tab-bible"), $("panel-bible")], cmp: [$("tab-cmp"), $("panel-cmp")] };
+  bible: [$("tab-bible"), $("panel-bible")], gc: [$("tab-gc"), $("panel-gc")], cmp: [$("tab-cmp"), $("panel-cmp")] };
 function showTab(name) {
   for (const [k, [btn, panel]] of Object.entries(tabs)) {
     const on = k === name, was = !panel.hidden;
     btn.setAttribute("aria-selected", String(on));
     panel.hidden = !on;
+    if (on) {  // on a narrow screen the tab bar scrolls: keep the chosen tab in view
+      const nav = btn.parentElement, l = btn.offsetLeft, r = l + btn.offsetWidth;
+      if (l < nav.scrollLeft) nav.scrollLeft = l - 8;
+      else if (r > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = r - nav.clientWidth + 8;
+    }
     if (on && !was) {
       // replay the slide-in for this page's cards
       panel.querySelectorAll(".rise").forEach((n) => { n.style.animation = "none"; void n.offsetWidth; n.style.animation = ""; });
     }
   }
   if (name === "tr") { showTotal(); if (!$("trResult").hidden) fitMien(); }
-  if (name !== "bible") closeWord();
+  if (name !== "bible" && name !== "gc") closeWord();
   if (name === "cmp") { $("cmpUser").value = $("userSel").value; cmpPickBatch(); renderCompare(); }
 }
 $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
 $("tab-tr").onclick = () => { showTab("tr"); $("enIn").focus(); };
 $("tab-bible").onclick = () => showTab("bible");
+$("tab-gc").onclick = () => showTab("gc");
 $("tab-cmp").onclick = () => showTab("cmp");
 
 // ---- Install as an app (Android / desktop Chrome) ------------------------------
