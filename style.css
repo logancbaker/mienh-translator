@@ -659,3 +659,9 @@ html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
 .cmp-item.locked { opacity: .5; }
 .cmp-item.locked .cmp-opt { cursor: not-allowed; }
 .cmp-item.locked .cmp-opt:hover { border-color: var(--line); }
+.cmp-item.sealed .cmp-opt { cursor: default; opacity: 1; }
+.cmp-item.sealed .cmp-opt:not([aria-checked="true"]) { opacity: .55; }
+.cmp-item.sealed .cmp-opt:hover { border-color: var(--line); }
+.cmp-item.sealed .cmp-opt[aria-checked="true"]:hover { border-color: var(--green); }
+.cmp-item.sealed .cmp-opt:active { transform: none; }
+.cmp-item.sealed textarea, .cmp-item.sealed input { opacity: .8; }

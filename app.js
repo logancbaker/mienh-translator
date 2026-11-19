@@ -1643,7 +1643,7 @@ $("wordSheetMore").onclick = () => {
 // Batches come from training/batch_*.json (built into the encrypted data). Answers go to
 // the "Compare" tab of the corrections Sheet; this device remembers what each user answered.
 const CMP_USERS = ["Gauv Meng", "Meix Waah", "Yauz-Seng", "Zanx Jiemh"];
-let cmpBatch = null, cmpIdx = 0, cmpChoice = null, cmpOrder = [], cmpReady = null;
+let cmpBatch = null, cmpIdx = 0, cmpChoice = null, cmpOrder = [], cmpReady = null, cmpEditing = null;
 const cmpKey = (who, id) => `cmp:${who}:${id}`;
 function cmpAnswered(who, id) { try { return JSON.parse(load(cmpKey(who, id)) || "null"); } catch (e) { return null; } }
 function cmpHash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -1750,10 +1750,22 @@ function renderCompare() {
   const locked = !CMP_USERS.includes(who);
   $("cmpItem").classList.toggle("locked", locked);
   $("cmpItem").querySelectorAll("button, textarea, input").forEach((n) => { if (locked) n.disabled = true; });
+  // An answered sentence is read-only (so going Back can't send it again) until "Change my answer".
+  const sealed = !locked && !!prev && cmpEditing !== it.id;
+  const editing = !locked && !!prev && cmpEditing === it.id;
+  $("cmpItem").classList.toggle("sealed", sealed);
   if (!locked) {
-    opts.querySelectorAll("button").forEach((n) => { n.disabled = false; });
-    $("cmpSkip").disabled = false; $("cmpOwn").disabled = false; $("cmpWhy").disabled = false;
+    opts.querySelectorAll("button").forEach((n) => { n.disabled = sealed; });
+    $("cmpOwn").disabled = sealed; $("cmpWhy").disabled = sealed;
+    $("cmpSkip").disabled = false;
   }
+  $("cmpEdit").hidden = !prev || locked;
+  $("cmpEdit").disabled = locked;
+  $("cmpEdit").textContent = editing ? "Cancel" : "✎ Change my answer";
+  $("cmpSend").hidden = sealed;
+  $("cmpSend").textContent = editing ? "Save my change →" : "Send & next →";
+  $("cmpSkip").textContent = prev ? "Next →" : "Skip";
+  if (sealed) $("cmpSkip").className = "btn"; else $("cmpSkip").className = "btn secondary";
 }
 function cmpPick(v, quiet) {
   if (!quiet && !CMP_USERS.includes(cmpWho())) return;
@@ -1769,6 +1781,7 @@ function cmpPick(v, quiet) {
 }
 async function cmpSend() {
   const who = cmpWho(), it = cmpBatch.items[cmpIdx], cfg = D.corrections || {};
+  if (cmpAnswered(who, it.id) && cmpEditing !== it.id) return;  // already sent; "Change my answer" first
   const own = $("cmpOwn").value.trim(), comment = $("cmpWhy").value.trim(), msg = $("cmpMsg");
   if (!CMP_USERS.includes(who)) { msg.textContent = "Choose your name in the User box first."; msg.className = "corr-msg err"; return; }
   if (cmpChoice === "none" && !own) { msg.textContent = "Please type how you would say it."; msg.className = "corr-msg err"; $("cmpOwn").focus(); return; }
@@ -1790,10 +1803,13 @@ async function cmpSend() {
       await fetch(cfg.url, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
     }
     store(cmpKey(who, it.id), JSON.stringify({ choice: cmpChoice, own, comment }));
+    const wasEdit = cmpEditing === it.id;
+    cmpEditing = null;
     if (who === "Zanx Jiemh") toast("Thanks! Sent for Yauz-Seng to review.");
-    cmpIdx = cmpNextOpen(cmpIdx);
+    else if (wasEdit) toast("Your change is saved.");
+    cmpIdx = wasEdit ? Math.min(cmpIdx + 1, cmpBatch.items.length) : cmpNextOpen(cmpIdx);
     renderCompare();
-    if (!$("cmpDone").hidden) celebrate();
+    if (!$("cmpDone").hidden && !wasEdit) celebrate();
     $("panel-cmp").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (err) {
     msg.textContent = `Couldn't send it (${err.message}). Check the connection and try again.`;
@@ -1808,8 +1824,13 @@ function cmpNextOpen(from) {
   return first < items.length ? first : items.length;
 }
 $("cmpSend").onclick = cmpSend;
-$("cmpSkip").onclick = () => { cmpIdx = Math.min(cmpIdx + 1, cmpBatch.items.length); if (cmpIdx >= cmpBatch.items.length) cmpIdx = cmpFirstOpen(); renderCompare(); };
-$("cmpPrev").onclick = () => { if (cmpIdx > 0) { cmpIdx--; renderCompare(); } };
+$("cmpEdit").onclick = () => {
+  const it = cmpBatch.items[cmpIdx];
+  cmpEditing = cmpEditing === it.id ? null : it.id;
+  renderCompare();
+};
+$("cmpSkip").onclick = () => { cmpEditing = null; cmpIdx = Math.min(cmpIdx + 1, cmpBatch.items.length); if (cmpIdx >= cmpBatch.items.length) cmpIdx = cmpFirstOpen(); renderCompare(); };
+$("cmpPrev").onclick = () => { cmpEditing = null; if (cmpIdx > 0) { cmpIdx--; renderCompare(); } };
 $("cmpReview").onclick = () => { cmpIdx = 0; $("cmpItem").hidden = false; $("cmpDone").hidden = true; renderCompare(); };
 $("cmpUser").onchange = () => {
   $("userSel").value = cmpWho(); store("user", cmpWho() || null); updateUserState();
