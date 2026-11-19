@@ -881,27 +881,33 @@ $("sideChk").onchange = () => { store("side", $("sideChk").checked ? null : "off
 
 function today() { return new Date().toLocaleDateString([], { year: "numeric", month: "long", day: "numeric" }); }
 
-$("printBtn").onclick = () => {
-  const area = $("printArea"), side = $("sideChk").checked;
+// Print and PDF are shared by the Translate tab and the two readers (Scriptures, General
+// Conference; 2026-11-19). rows = [{ mi, en, head }]: head rows are section headings.
+// side = English beside the Mienh. title / sub (optional) go at the top.
+function printRows({ rows, side, title, sub }) {
+  const area = $("printArea");
   const head = el("div", "p-head");
   head.append(el("span", null, "Mienh Translator"), el("span", null, today()));
   area.replaceChildren(head);
+  if (title) area.append(el("h1", "p-title", title));
+  if (sub) area.append(el("div", "p-sub", sub));
   if (side) {
     const t = el("table"), thead = el("thead"), hr = el("tr"), tb = el("tbody");
     hr.append(el("th", null, "Mienh"), el("th", null, "English"));
     thead.append(hr);
-    for (const r of pairs()) {
-      const tr = el("tr");
+    for (const r of rows) {
+      const tr = el("tr", r.head ? "h" : null);
       tr.append(el("td", "mi", r.mi), el("td", "en", r.en));
       tb.append(tr);
     }
     t.append(thead, tb);
     area.append(t);
   } else {
-    for (const para of pairs().map((r) => r.mi).filter(Boolean)) area.append(el("p", null, para));
+    for (const r of rows.filter((x) => x.mi)) area.append(el("p", r.head ? "h" : null, r.mi));
   }
   window.print();
-};
+}
+$("printBtn").onclick = () => printRows({ rows: pairs(), side: $("sideChk").checked });
 
 // PDF: drawn with jsPDF so both columns stay on the same lines across pages.
 let jsPDFLoad = null;
@@ -921,57 +927,79 @@ function loadJsPDF() {
 const pdfSafe = (t) => t.replace(/[‘’ʼ]/g, "'").replace(/[“”]/g, '"')
   .replace(/↔/g, "<->").replace(/→/g, "->").replace(/[–—]/g, "-").replace(/…/g, "...")
   .replace(/[^\x09\x0a\x0d\x20-\x7e\xa0-\xff]/g, "");
+const fileSafe = (t) => pdfSafe(t).replace(/[\\/:*?"<>|^]+/g, "").replace(/\s+/g, " ").trim().slice(0, 90) || "mienh";
 
-$("pdfBtn").onclick = async () => {
-  const btn = $("pdfBtn");
+async function pdfRows({ rows, side, title, sub, file, btn, label }) {
   btn.disabled = true; btn.textContent = "Making PDF…";
   try {
     const JsPDF = await loadJsPDF();
     const doc = new JsPDF({ unit: "pt", format: "letter" });
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
     const M = 40, top = M + 26, bottom = H - M, gutter = 22, size = 10.5, lh = size * 1.42;
-    const side = $("sideChk").checked;
     const colW = side ? (W - 2 * M - gutter) / 2 : W - 2 * M;
     let page = 1, y = top;
+    const colHeads = () => {
+      if (!side) return;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(60);
+      doc.text("MIENH", M, y + 6); doc.text("ENGLISH", M + colW + gutter, y + 6);
+      y += 16;
+    };
     const header = () => {
       doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(110);
       doc.text("Mienh Translator", M, M + 6);
       doc.text(`${today()}  ·  page ${page}`, W - M, M + 6, { align: "right" });
       doc.setDrawColor(170); doc.setLineWidth(0.5); doc.line(M, M + 12, W - M, M + 12);
-      if (side) {
-        doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(60);
-        doc.text("MIENH", M, top - 2); doc.text("ENGLISH", M + colW + gutter, top - 2);
-        y = top + 10;
-      } else y = top;
+      y = top - 8;
+      colHeads();
       doc.setTextColor(0);
     };
     const newPage = () => { doc.addPage(); page += 1; header(); };
-    header();
-    doc.setFont("times", "normal"); doc.setFontSize(size);
-    for (const r of pairs()) {
-      const L = doc.splitTextToSize(pdfSafe(r.mi), colW);
-      const R = side ? doc.splitTextToSize(pdfSafe(r.en), colW) : [];
-      const rows = Math.max(L.length, R.length);
-      if (!rows) continue;
-      // start a short paragraph on a new page rather than split it
-      if (rows <= 6 && y + rows * lh > bottom) newPage();
-      for (let i = 0; i < rows; i++) {
+    // title block on the first page
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(110);
+    doc.text("Mienh Translator", M, M + 6);
+    doc.text(`${today()}  ·  page 1`, W - M, M + 6, { align: "right" });
+    doc.setDrawColor(170); doc.setLineWidth(0.5); doc.line(M, M + 12, W - M, M + 12);
+    y = top - 8;
+    if (title) {
+      doc.setFont("times", "bold"); doc.setFontSize(17); doc.setTextColor(0);
+      for (const line of doc.splitTextToSize(pdfSafe(title), W - 2 * M)) { doc.text(line, M, y + 17); y += 21; }
+    }
+    if (sub) {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(90);
+      for (const line of doc.splitTextToSize(pdfSafe(sub), W - 2 * M)) { doc.text(line, M, y + 10); y += 13; }
+    }
+    if (title || sub) y += 10;
+    colHeads();
+    doc.setTextColor(0);
+    for (const r of rows) {
+      const font = r.head ? "bold" : "normal";
+      doc.setFont("times", font); doc.setFontSize(size);
+      const L = doc.splitTextToSize(pdfSafe(r.mi || ""), colW);
+      const R = side ? doc.splitTextToSize(pdfSafe(r.en || ""), colW) : [];
+      const n = Math.max(L.length, R.length);
+      if (!n) continue;
+      // start a short paragraph (or a heading and what follows) on a new page rather than split it
+      if ((n <= 6 || r.head) && y + (r.head ? n + 3 : n) * lh > bottom) newPage();
+      if (r.head) y += lh * 0.3;
+      for (let i = 0; i < n; i++) {
         if (y + lh > bottom) newPage();
-        doc.setFont("times", "normal"); doc.setFontSize(size); doc.setTextColor(0);
+        doc.setFont("times", font); doc.setFontSize(size); doc.setTextColor(0);
         if (L[i]) doc.text(L[i], M, y + size);
         if (R[i]) { doc.setTextColor(50); doc.text(R[i], M + colW + gutter, y + size); }
         y += lh;
       }
       y += lh * 0.6;
-      if (side && y < bottom) { doc.setDrawColor(215); doc.line(M, y - lh * 0.3, W - M, y - lh * 0.3); }
+      if (side && !r.head && y < bottom) { doc.setDrawColor(215); doc.line(M, y - lh * 0.3, W - M, y - lh * 0.3); }
     }
-    doc.save(`mienh-translation-${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`${fileSafe(file)}.pdf`);
   } catch (e) {
-    fail(e.message || "Couldn't make the PDF.");
+    toast(e.message || "Couldn't make the PDF.");
   } finally {
-    btn.disabled = false; btn.textContent = "Create PDF";
+    btn.disabled = false; btn.textContent = label;
   }
-};
+}
+$("pdfBtn").onclick = () => pdfRows({ rows: pairs(), side: $("sideChk").checked,
+  file: `mienh-translation-${new Date().toISOString().slice(0, 10)}`, btn: $("pdfBtn"), label: "Create PDF" });
 
 // ---- Corrections from fluent speakers -------------------------------------------
 // Highlight words in the translation, type the correction, pick your name, send.
@@ -1584,6 +1612,34 @@ $("gcPrev").onclick = $("gcPrev2").onclick = () => stepTalk(-1);
 $("gcNext").onclick = $("gcNext2").onclick = () => stepTalk(1);
 $("gcSide").onchange = () => { store("gcSide", $("gcSide").checked ? "1" : "0"); $("gcOut").classList.toggle("single", !$("gcSide").checked); };
 
+// ---- Print and PDF for the readers --------------------------------------------------
+// What is on screen: the chapter or talk, with or without the English (the checkbox).
+function bibleDoc() {
+  const b = bibleBooks()[bibleBook], c = b && b.chapters[bibleChap];
+  if (!c) return null;
+  const side = $("bibleSide").checked, rows = [];
+  let lastHead = null;
+  for (const [n, mien, en, head] of c.verses) {
+    if (head && head !== lastHead) { rows.push({ mi: head, en: "", head: true }); lastHead = head; }
+    const num = n ? String(n) : "Title";
+    rows.push({ mi: `${num}  ${mien}`, en: `${num}  ${en}` });
+  }
+  return { rows, side, title: `${b.mien} ${c.n}`,
+    sub: `${b.en !== b.mien ? `${b.en} ${c.n} · ` : ""}${b.src || "Mienh Bible"}${side ? `, with the ${b.eng || "King James Version"}` : ""}`,
+    file: `${b.en} ${c.n} - Mienh` };
+}
+function gcDoc() {
+  const t = gcTalks()[gcIdx];
+  if (!t) return null;
+  return { rows: t.paras.map(([en, mien, h]) => ({ mi: mien, en, head: !!h })), side: $("gcSide").checked,
+    title: t.mien || t.title, sub: `${gcLabel(t)} · ${t.confLabel} General Conference`,
+    file: `${t.confLabel} - ${t.speaker} - ${t.title} - Mienh` };
+}
+for (const [print, pdf, make] of [["biblePrint", "biblePdf", bibleDoc], ["gcPrint", "gcPdf", gcDoc]]) {
+  $(print).onclick = () => { const d = make(); if (d) { closeWord(); printRows(d); } };
+  $(pdf).onclick = () => { const d = make(); if (d) pdfRows({ ...d, btn: $(pdf), label: "Save PDF" }); };
+}
+
 // ---- Search boxes (Scriptures and General Conference) ------------------------------
 // Type part of a name; matching books / talks appear under the box. Arrow keys and Enter
 // (or a tap) open one, so the dropdowns aren't needed.
@@ -1984,6 +2040,7 @@ function showTab(name) {
     const on = k === name, was = !panel.hidden;
     btn.setAttribute("aria-selected", String(on));
     panel.hidden = !on;
+    if (on) $("menuLabel").textContent = btn.textContent.replace(/\s*✓$/, "");
     if (on) {  // on a narrow screen the tab bar scrolls: keep the chosen tab in view
       const nav = btn.parentElement, l = btn.offsetLeft, r = l + btn.offsetWidth;
       if (l < nav.scrollLeft) nav.scrollLeft = l - 8;
@@ -1998,6 +2055,23 @@ function showTab(name) {
   if (name !== "bible" && name !== "gc") closeWord();
   if (name === "cmp") { $("cmpUser").value = $("userSel").value; cmpPickBatch(); renderCompare(); }
 }
+// Phone menu (user, 2026-11-19): on a phone the tabs fold into a ☰ menu in the header; the
+// button shows the page you're on. On wider screens the menu button is hidden by the CSS.
+function setMenu(open) {
+  if (open) {  // drop the menu just under the header
+    const h = $("menuBtn").closest("header");
+    $("tabsNav").style.top = `${h.offsetTop + h.offsetHeight + 2}px`;
+  }
+  $("tabsNav").classList.toggle("open", open);
+  $("menuBtn").setAttribute("aria-expanded", String(open));
+  $("menuBtn").setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+}
+$("menuBtn").onclick = (e) => { e.stopPropagation(); setMenu(!$("tabsNav").classList.contains("open")); };
+$("tabsNav").addEventListener("click", (e) => { if (e.target.closest("button")) setMenu(false); });
+document.addEventListener("click", (e) => {
+  if ($("tabsNav").classList.contains("open") && !e.target.closest("#tabsNav, #menuBtn")) setMenu(false);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("tabsNav").classList.contains("open")) { setMenu(false); $("menuBtn").focus(); } });
 $("tab-home").onclick = () => showTab("home");
 $("tab-dict").onclick = () => { showTab("dict"); $("q").focus(); };
 $("tab-tr").onclick = () => { showTab("tr"); $("enIn").focus(); };

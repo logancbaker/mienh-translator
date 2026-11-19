@@ -580,9 +580,9 @@ mark.sent { background: none; color: inherit; text-decoration: underline wavy va
 .word-sheet-body .src { color: var(--muted); font-size: 12px; }
 .word-sheet-body .none { color: var(--muted); padding: 6px 0; }
 #wordSheetMore { align-self: flex-start; }
-/* Six tabs don't fit a phone or a narrow window: the tab bar scrolls sideways instead of
-   squeezing the names into each other (2026-11-19, when General Conference was added). */
-@media (max-width: 820px) {
+/* Six tabs don't fit a narrow window: the tab bar scrolls sideways instead of squeezing the
+   names into each other (2026-11-19). On a phone (below 700px) the tabs fold into a menu. */
+@media (min-width: 700px) and (max-width: 820px) {
   nav.tabs { gap: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   nav.tabs::-webkit-scrollbar { display: none; }
   nav.tabs button { flex: 0 0 auto; white-space: nowrap; padding: 10px 10px; }
@@ -682,3 +682,38 @@ html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
 .find-list li[aria-selected="true"], .find-list li:hover { background: var(--accent-soft); }
 .find-list li.none { color: var(--muted); cursor: default; background: none; }
 .bverse.bsec .bhead { margin: 10px 0 0; }
+
+/* ---- Phone menu (☰): only below 700px wide (user, 2026-11-19) ---- */
+.menu-btn { display: none; }
+@media (max-width: 699px) {
+  header.top { position: relative; z-index: 30; }
+  .menu-btn { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; appearance: none;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 650;
+    font-size: 15px; padding: 8px 12px; border-radius: 999px; cursor: pointer; max-width: 46vw; flex: none; }
+  .menu-btn #menuLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu-ico { display: inline-grid; gap: 3px; flex: none; }
+  .menu-ico i { display: block; width: 16px; height: 2px; border-radius: 2px; background: currentColor; transition: transform .2s, opacity .2s; }
+  .menu-btn[aria-expanded="true"] .menu-ico i:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+  .menu-btn[aria-expanded="true"] .menu-ico i:nth-child(2) { opacity: 0; }
+  .menu-btn[aria-expanded="true"] .menu-ico i:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+  header.top .brand { white-space: nowrap; min-width: 0; }
+  header.top .chip.install { margin-left: auto; }
+  header.top .chip.install + .menu-btn { margin-left: 0; }
+  nav.tabs { display: none; }
+  nav.tabs.open { display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: 40; right: 0; left: 0;
+    padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 14px 40px rgba(0,0,0,.25); margin: 0; }
+  nav.tabs.open button { text-align: left; padding: 12px 14px; border: 0; border-radius: 10px; margin: 0; font-size: 16px; flex: none; }
+  nav.tabs.open button[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); }
+  nav.tabs.open #tab-cmp { margin-left: 0; margin-top: 6px; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; }
+  #app { position: relative; }
+}
+
+/* Print: title of a chapter or talk, and section headings */
+@media print {
+  #printArea .p-title { font: 700 17pt Georgia, "Times New Roman", serif; margin: 0 0 3pt; }
+  #printArea .p-sub { font: 9.5pt -apple-system, Helvetica, Arial, sans-serif; color: #555; margin: 0 0 12pt; }
+  #printArea p.h, #printArea tr.h td { font-weight: 700; }
+  #printArea tr.h td { border-bottom: 0; padding-top: 10pt; }
+}
+.doc-btns { display: inline-flex; gap: 8px; }
