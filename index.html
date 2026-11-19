@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=ba514a8817">
+<link rel="stylesheet" href="style.css?v=3de3957d80">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -129,12 +129,14 @@
         <div class="row bible-nav">
           <button class="btn secondary small" id="biblePrev" type="button">← Previous</button>
           <button class="btn secondary small" id="bibleNext" type="button">Next →</button>
-          <span class="export-wrap"><button class="btn secondary small export-btn" id="bibleExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="bibleExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="bibleExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
           <label class="check inline"><input type="checkbox" id="bibleSide" checked> English side by side</label>
         </div>
         <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
       </div>
-      <h2 class="bible-title" id="bibleTitle"></h2>
+      <div class="reader-head">
+        <h2 class="bible-title" id="bibleTitle"></h2>
+        <span class="export-wrap"><button class="btn secondary small export-btn" id="bibleExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="bibleExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="bibleExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
+      </div>
       <div id="bibleOut" class="bible-out"></div>
       <div class="bible-nav bottom" id="bibleNavBottom" hidden>
         <button class="btn secondary small" id="biblePrev2" type="button">← Previous chapter</button>
@@ -158,12 +160,14 @@
         <div class="row bible-nav">
           <button class="btn secondary small" id="gcPrev" type="button">← Previous</button>
           <button class="btn secondary small" id="gcNext" type="button">Next →</button>
-          <span class="export-wrap"><button class="btn secondary small export-btn" id="gcExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="gcExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="gcExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
           <label class="check inline"><input type="checkbox" id="gcSide" checked> English side by side</label>
         </div>
         <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
       </div>
-      <h2 class="bible-title" id="gcTitle"></h2>
+      <div class="reader-head">
+        <h2 class="bible-title" id="gcTitle"></h2>
+        <span class="export-wrap"><button class="btn secondary small export-btn" id="gcExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="gcExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="gcExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
+      </div>
       <div id="gcOut" class="bible-out"></div>
       <div class="bible-nav bottom" id="gcNavBottom" hidden>
         <button class="btn secondary small" id="gcPrev2" type="button">← Previous talk</button>
@@ -335,7 +339,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=ba514a8817"></script>
+<script type="module" src="app.js?v=3de3957d80"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>

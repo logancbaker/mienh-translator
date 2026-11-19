@@ -732,3 +732,7 @@ html.is-mac .non-mac, html:not(.is-mac) .mac-only { display: none; }
   .menu-btn #menuLabel { display: none; }
   .menu-btn { padding: 9px 11px; }
 }
+/* Export sits on the title row, right above the text it exports (user, 2026-11-19) */
+.reader-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 18px 2px 8px; }
+.reader-head .bible-title { margin: 0; min-width: 0; }
+.reader-head .export-wrap { flex: none; margin-top: 2px; }
