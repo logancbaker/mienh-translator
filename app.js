@@ -907,7 +907,6 @@ function printRows({ rows, side, title, sub }) {
   }
   window.print();
 }
-$("printBtn").onclick = () => printRows({ rows: pairs(), side: $("sideChk").checked });
 
 // PDF: drawn with jsPDF so both columns stay on the same lines across pages.
 let jsPDFLoad = null;
@@ -995,11 +994,109 @@ async function pdfRows({ rows, side, title, sub, file, btn, label }) {
   } catch (e) {
     toast(e.message || "Couldn't make the PDF.");
   } finally {
-    btn.disabled = false; btn.textContent = label;
+    btn.disabled = false; btn.innerHTML = label;
   }
 }
-$("pdfBtn").onclick = () => pdfRows({ rows: pairs(), side: $("sideChk").checked,
-  file: `mienh-translation-${new Date().toISOString().slice(0, 10)}`, btn: $("pdfBtn"), label: "Create PDF" });
+// Word: a real .docx (made with JSZip, loaded from cdnjs on first use): title, source, then a
+// two-column table (Mienh | English) or Mienh paragraphs, headings in bold.
+let zipLoad = null;
+function loadZip() {
+  if (!zipLoad) {
+    zipLoad = new Promise((ok, bad) => {
+      const sc = document.createElement("script");
+      sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      sc.onload = () => ok(window.JSZip);
+      sc.onerror = () => { zipLoad = null; bad(new Error("Couldn't load the Word maker. Check the connection.")); };
+      document.head.append(sc);
+    });
+  }
+  return zipLoad;
+}
+const xmlEsc = (t) => String(t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "");
+function wPara(text, { bold = false, size = 22, color = null, after = 120 } = {}) {
+  const rPr = `<w:rPr>${bold ? "<w:b/>" : ""}${color ? `<w:color w:val="${color}"/>` : ""}<w:sz w:val="${size}"/></w:rPr>`;
+  const runs = String(text || "").split("\n").map((line, i) => `${i ? "<w:r><w:br/></w:r>" : ""}<w:r>${rPr}<w:t xml:space="preserve">${xmlEsc(line)}</w:t></w:r>`).join("");
+  return `<w:p><w:pPr><w:spacing w:after="${after}"/></w:pPr>${runs}</w:p>`;
+}
+async function docxRows({ rows, side, title, sub, file, btn, label }) {
+  btn.disabled = true; btn.textContent = "Making Word file…";
+  try {
+    const JSZip = await loadZip();
+    let body = "";
+    if (title) body += wPara(title, { bold: true, size: 34, after: 60 });
+    body += wPara(sub || `Mienh Translator · ${today()}`, { size: 19, color: "666666", after: 240 });
+    if (side) {
+      const cell = (t, o) => `<w:tc><w:tcPr><w:tcW w:w="4680" w:type="dxa"/></w:tcPr>${wPara(t, o)}</w:tc>`;
+      const head = `<w:tr><w:trPr><w:tblHeader/></w:trPr>${cell("MIENH", { bold: true, size: 18, color: "444444" })}${cell("ENGLISH", { bold: true, size: 18, color: "444444" })}</w:tr>`;
+      const trs = rows.map((r) => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cell(r.mi, { bold: r.head })}${cell(r.en, { bold: r.head, color: "333333" })}</w:tr>`).join("");
+      const b = (n) => `<w:${n} w:val="single" w:sz="4" w:space="0" w:color="BBBBBB"/>`;
+      body += `<w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblBorders>${b("top")}${b("bottom")}${b("insideH")}${b("insideV")}</w:tblBorders>`
+        + `<w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr>`
+        + `<w:tblGrid><w:gridCol w:w="4680"/><w:gridCol w:w="4680"/></w:tblGrid>${head}${trs}</w:tbl>${wPara("")}`;
+    } else {
+      body += rows.filter((r) => r.mi).map((r) => wPara(r.mi, { bold: r.head, after: 160 })).join("");
+    }
+    const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${W}"><w:body>${body}`
+      + `<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1080" w:right="1080" w:bottom="1080" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+    const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="${W}"><w:docDefaults><w:rPrDefault><w:rPr>`
+      + `<w:rFonts w:ascii="Georgia" w:hAnsi="Georgia" w:cs="Georgia"/><w:sz w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault>`
+      + `<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>`;
+    const zip = new JSZip();
+    zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`
+      + `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>`
+      + `<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>`
+      + `<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`);
+    zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+      + `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+    zip.file("word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+      + `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+    zip.file("word/document.xml", docXml);
+    zip.file("word/styles.xml", styles);
+    const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${fileSafe(file)}.docx`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  } catch (e) {
+    toast(e.message || "Couldn't make the Word file.");
+  } finally {
+    btn.disabled = false; btn.innerHTML = label;
+  }
+}
+
+// One "Export ▾" menu on each page that has a translation (Translate, Scriptures, General
+// Conference; user, 2026-11-19): Print, PDF or Word document. make() returns what is on screen.
+const EXPORT_LABEL = 'Export <span aria-hidden="true">▾</span>';
+function setupExport(pre, make) {
+  const btn = $(`${pre}Export`), menu = $(`${pre}ExportMenu`);
+  const show = (on) => {
+    menu.hidden = !on; btn.setAttribute("aria-expanded", String(on));
+    if (on) menu.classList.toggle("right", btn.getBoundingClientRect().left + 200 > innerWidth);  // keep it on screen
+  };
+  btn.onclick = (e) => { e.stopPropagation(); show(menu.hidden); if (!menu.hidden) menu.querySelector("button").focus(); };
+  menu.addEventListener("click", (e) => {
+    const it = e.target.closest("button[data-fmt]");
+    if (!it) return;
+    show(false);
+    const d = make();
+    if (!d || !d.rows.some((r) => r.mi)) { toast("Nothing to export yet."); return; }
+    if (it.dataset.fmt === "print") { closeWord(); printRows(d); }
+    else if (it.dataset.fmt === "pdf") pdfRows({ ...d, btn, label: EXPORT_LABEL });
+    else docxRows({ ...d, btn, label: EXPORT_LABEL });
+  });
+  menu.addEventListener("keydown", (e) => {
+    const items = [...menu.querySelectorAll("button")], i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { items[(i + 1) % items.length].focus(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { items[(i - 1 + items.length) % items.length].focus(); e.preventDefault(); }
+    else if (e.key === "Escape") { show(false); btn.focus(); }
+  });
+  document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest(`#${pre}ExportMenu`)) show(false); });
+}
+setupExport("tr", () => ({ rows: pairs(), side: $("sideChk").checked,
+  file: `mienh-translation-${new Date().toISOString().slice(0, 10)}` }));
 
 // ---- Corrections from fluent speakers -------------------------------------------
 // Highlight words in the translation, type the correction, pick your name, send.
@@ -1635,10 +1732,8 @@ function gcDoc() {
     title: t.mien || t.title, sub: `${gcLabel(t)} · ${t.confLabel} General Conference`,
     file: `${t.confLabel} - ${t.speaker} - ${t.title} - Mienh` };
 }
-for (const [print, pdf, make] of [["biblePrint", "biblePdf", bibleDoc], ["gcPrint", "gcPdf", gcDoc]]) {
-  $(print).onclick = () => { const d = make(); if (d) { closeWord(); printRows(d); } };
-  $(pdf).onclick = () => { const d = make(); if (d) pdfRows({ ...d, btn: $(pdf), label: "Save PDF" }); };
-}
+setupExport("bible", bibleDoc);
+setupExport("gc", gcDoc);
 
 // ---- Search boxes (Scriptures and General Conference) ------------------------------
 // Type part of a name; matching books / talks appear under the box. Arrow keys and Enter

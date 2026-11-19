@@ -12,7 +12,7 @@
 <meta name="application-name" content="Mienh Translator">
 <meta name="apple-mobile-web-app-title" content="Mienh">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="style.css?v=f35c2d1bb0">
+<link rel="stylesheet" href="style.css?v=ba514a8817">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -129,8 +129,7 @@
         <div class="row bible-nav">
           <button class="btn secondary small" id="biblePrev" type="button">← Previous</button>
           <button class="btn secondary small" id="bibleNext" type="button">Next →</button>
-          <span class="doc-btns"><button class="btn secondary small" id="biblePrint" type="button">Print</button>
-          <button class="btn secondary small" id="biblePdf" type="button">Save PDF</button></span>
+          <span class="export-wrap"><button class="btn secondary small export-btn" id="bibleExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="bibleExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="bibleExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
           <label class="check inline"><input type="checkbox" id="bibleSide" checked> English side by side</label>
         </div>
         <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
@@ -159,8 +158,7 @@
         <div class="row bible-nav">
           <button class="btn secondary small" id="gcPrev" type="button">← Previous</button>
           <button class="btn secondary small" id="gcNext" type="button">Next →</button>
-          <span class="doc-btns"><button class="btn secondary small" id="gcPrint" type="button">Print</button>
-          <button class="btn secondary small" id="gcPdf" type="button">Save PDF</button></span>
+          <span class="export-wrap"><button class="btn secondary small export-btn" id="gcExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="gcExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="gcExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
           <label class="check inline"><input type="checkbox" id="gcSide" checked> English side by side</label>
         </div>
         <div class="hint">Tap any word to look it up in the dictionary. To look up a phrase, <span class="mac-only">⌘-click</span><span class="non-mac">Ctrl-click</span> more words, or use “+ Next word”.</div>
@@ -291,8 +289,7 @@
                 </span>
                 <span class="spacer"></span>
                 <button class="btn secondary small" id="copyBtn" type="button">Copy</button>
-                <button class="btn secondary small" id="printBtn" type="button">Print</button>
-                <button class="btn secondary small" id="pdfBtn" type="button">Create PDF</button>
+                <span class="export-wrap"><button class="btn secondary small export-btn" id="trExport" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="trExportMenu">Export <span aria-hidden="true">▾</span></button><span class="export-menu" id="trExportMenu" role="menu" hidden><button type="button" role="menuitem" data-fmt="print">🖨 Print</button><button type="button" role="menuitem" data-fmt="pdf">📄 PDF</button><button type="button" role="menuitem" data-fmt="docx">📝 Word document</button></span></span>
                 <button class="btn secondary small" id="corrBtn" type="button" aria-pressed="false">✎ Suggest a correction</button>
               </div>
               <div class="dict-banner" id="dictBanner" hidden>Highlight any Mienh or English words to see what they mean (press and hold on a phone).</div>
@@ -338,7 +335,7 @@
     <div class="foot"><span id="built"></span> · <button id="lockBtn" type="button">Lock this device</button></div>
   </div>
 </div>
-<script type="module" src="app.js?v=f35c2d1bb0"></script>
+<script type="module" src="app.js?v=ba514a8817"></script>
 <div id="printArea" aria-hidden="true"></div>
 <form class="corr-pop" id="corrPop" hidden>
   <div class="corr-pop-head"><span class="kicker" id="corrKind">Correct the Mienh</span><button type="button" class="corr-x" id="corrClose" aria-label="Close">×</button></div>
