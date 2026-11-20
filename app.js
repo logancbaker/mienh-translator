@@ -490,6 +490,69 @@ function logUsage(rec) {
     .catch(() => fetch(cfg.url, { method: "POST", mode: "no-cors", body }).catch(() => {}));
 }
 
+// ---- Keeping the rules cache warm (user, 2026-11-19) -------------------------------
+// Every translation sends the same large rules package (instructions, gospel terms,
+// corrections, grammar notes, confirmed sentences) as a cached system prompt. A cache entry
+// lives 5 minutes from the start of the last request that used it; reading it costs about
+// 5% of the normal price, saving it about 125%. Translations are often far apart, so after a
+// translation, while this page stays open on the Translate tab and someone is using it, a
+// tiny request (max_tokens: 0: no answer, only a cache read) refreshes the entry about every
+// 4 minutes, for up to 30 minutes. The prompt itself is never changed, so quality is the same.
+function sharedParams(model, effort, sysText) {
+  // Everything that shapes the cached prefix, identical for translations and refreshes.
+  return {
+    model,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: { effort },
+    system: [{ type: "text", text: sysText, cache_control: { type: "ephemeral" } }],
+  };
+}
+const WARM = { every: 235e3, max: 30 * 60e3, idle: 15 * 60e3 };
+let warm = null, lastActive = Date.now();
+for (const ev of ["pointerdown", "keydown", "scroll", "touchstart"]) {
+  addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true });
+}
+function stopWarm() { if (warm) { clearInterval(warm.timer); warm = null; } }
+function startWarm(model, effort, sysText, startedAt) {
+  stopWarm();
+  warm = { model, effort, sysText, since: startedAt, last: startedAt, busy: false };
+  warm.timer = setInterval(warmTick, 20e3);
+}
+async function warmTick() {
+  const w = warm;
+  if (!w || w.busy || busy) return;
+  const now = Date.now();
+  if (now - w.since > WARM.max || now - lastActive > WARM.idle || document.hidden || $("panel-tr").hidden) {
+    if (now - w.since > WARM.max || now - lastActive > WARM.idle) stopWarm();
+    return;  // tab hidden or on another page: skip this time
+  }
+  if (now - w.last < WARM.every) return;
+  // Only refresh the very same prompt; if new data arrived, a refresh would pay for a new save.
+  if (staticSystem() !== w.sysText || !D.apiKey) { stopWarm(); return; }
+  w.busy = true;
+  w.last = now;
+  try {
+    const client = new Anthropic({ apiKey: D.apiKey, dangerouslyAllowBrowser: true });
+    const msg = await client.beta.messages.create({
+      ...sharedParams(w.model, w.effort, w.sysText),
+      max_tokens: 0,
+      messages: [{ role: "user", content: "." }],
+    });
+    const u = msg.usage || {}, P = (D.models[w.model] || {}).prices || D.prices;
+    const cost = ((u.input_tokens || 0) * P.input + (u.cache_read_input_tokens || 0) * P.cache_read +
+      (u.cache_creation_input_tokens || 0) * P.cache_write) / 1e6;
+    if ((u.cache_creation_input_tokens || 0) > 0) stopWarm();  // the entry had already expired: don't keep paying for saves
+    logUsage({ user: currentUser(), words: 0, paragraphs: 0, model: `${modelName(w.model)} (keep cache warm)`,
+      effort: w.effort, inTok: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
+      outTok: 0, notes: false, notesTok: 0, notesUsd: 0, usd: Number(cost.toFixed(5)), seconds: 0 });
+  } catch (e) {
+    stopWarm();  // offline, or the API refused: just stop; the next translation works as usual
+  } finally {
+    if (warm === w) w.busy = false;
+  }
+}
+
 $("goBtn").onclick = async () => {
   const text = $("enIn").value.trim();
   if (!currentUser()) { $("userSel").focus(); return; }
@@ -539,13 +602,11 @@ $("goBtn").onclick = async () => {
   try {
     const { context, nWords, nMissing } = requestContext(text);
     const client = new Anthropic({ apiKey: D.apiKey, dangerouslyAllowBrowser: true });
+    const sysText = staticSystem();
+    stopWarm();  // this request refreshes the cache itself
     const stream = client.beta.messages.stream({
-      model: chosenModel,
+      ...sharedParams(chosenModel, chosenEffort, sysText),
       max_tokens: 64000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: chosenEffort },
-      system: [{ type: "text", text: staticSystem(), cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: [
         { type: "text", text: context },
         { type: "text", text: (wantNotes ? "" : "Skip the notes this time: answer with only the <meaning> and <translation> sections.\n\n") +
@@ -594,7 +655,10 @@ $("goBtn").onclick = async () => {
       inTok: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0),
       outTok: u.output_tokens || 0, notes: wantNotes, notesTok, notesUsd: Number(notesUsd.toFixed(5)),
       usd: Number(cost.toFixed(5)), seconds: Math.round((Date.now() - started) / 1000) });
-    $("trMeta").textContent = `Cost about ${money(cost)} (${modelName(chosenModel)}, ${chosenEffort} effort)` +
+    startWarm(chosenModel, chosenEffort, sysText, started);
+    const cacheNote = (u.cache_read_input_tokens || 0) > 0 ? " · rules read from the cache"
+      : (u.cache_creation_input_tokens || 0) > 0 ? " · rules saved to the cache" : " · not cached";
+    $("trMeta").textContent = `Cost about ${money(cost)} (${modelName(chosenModel)}, ${chosenEffort} effort)${cacheNote}` +
       (wantNotes ? ` · notes ≈ ${notesTok} tokens (${money(notesUsd)})` : "") +
       ` · ${nWords} words looked up, ${nMissing} not in the dictionary` +
       (msg.stop_reason === "max_tokens" ? " · The answer was cut off: try a shorter text." : "");
