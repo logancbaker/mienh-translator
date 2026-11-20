@@ -2000,7 +2000,8 @@ function renderCompare() {
   const done = items.filter((it) => cmpAnswered(who, it.id)).length;
   if (who) cmpSync(who);
   $("cmpFill").style.width = `${Math.round(100 * done / n)}%`;
-  $("cmpCount").textContent = done === n ? "✓ Completed" : `${done} of ${n} answered`;
+  const num = who && (cmpBatch.nums || {})[who];  // each speaker's own batch count
+  $("cmpCount").textContent = (num ? `Batch ${num} · ` : "") + (done === n ? "✓ Completed" : `${done} of ${n} answered`);
   $("cmpCount").classList.toggle("done", done === n);
   $("tab-cmp").textContent = cmpComplete(who) ? "Translation Training ✓" : "Translation Training";
   const note = $("cmpNote"); note.replaceChildren();
